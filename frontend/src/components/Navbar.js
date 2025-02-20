@@ -24,7 +24,14 @@ export default function Navbar() {
           <div className="flex items-center">
             {user ? (
               <div className="flex items-center space-x-4">
-                {user.role === 'driver' ? (
+                {user.role === 'admin' ? (
+                  <Link 
+                    to="/admin" 
+                    className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Painel Admin
+                  </Link>
+                ) : user.role === 'driver' ? (
                   <Link 
                     to="/driver-dashboard" 
                     className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
@@ -59,12 +66,27 @@ export default function Navbar() {
                 >
                   Entrar
                 </Link>
-                <Link 
-                  to="/register" 
-                  className="bg-indigo-500 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-600"
-                >
-                  Cadastrar
-                </Link>
+                <div className="relative group">
+                  <button 
+                    className="bg-indigo-500 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-indigo-600"
+                  >
+                    Cadastrar
+                  </button>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 hidden group-hover:block">
+                    <Link
+                      to="/register/passenger"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Como Passageiro
+                    </Link>
+                    <Link
+                      to="/register/driver"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Como Motorista
+                    </Link>
+                  </div>
+                </div>
               </div>
             )}
           </div>

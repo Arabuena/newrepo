@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { login } from '../services/auth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login: authLogin } = useAuth();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -15,21 +14,23 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    setLoading(true);
 
     try {
-      const response = await login(formData.email, formData.password);
-      authLogin(response.user);
+      const user = await login(formData.email, formData.password);
+      console.log('Login successful:', user); // Para debug
       
-      // Redireciona baseado no tipo de usuário
-      if (response.user.role === 'driver') {
+      if (user.role === 'admin') {
+        navigate('/admin');
+      } else if (user.role === 'driver') {
         navigate('/driver-dashboard');
       } else {
         navigate('/request-ride');
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Login error:', err); // Para debug
+      setError(err.toString());
     } finally {
       setLoading(false);
     }
@@ -49,6 +50,13 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
+        
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
@@ -79,26 +87,13 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {error && (
-            <div className="text-red-500 text-sm text-center">
-              {error}
-            </div>
-          )}
-
           <div>
             <button
               type="submit"
               disabled={loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {loading ? (
-                <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </span>
-              ) : 'Entrar'}
+              {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </div>
         </form>

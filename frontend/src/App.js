@@ -4,10 +4,12 @@ import { AuthProvider } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
+import PassengerRegister from './pages/PassengerRegister';
+import DriverRegister from './pages/DriverRegister';
 import RequestRide from './pages/RequestRide';
 import DriverDashboard from './pages/DriverDashboard';
 import PrivateRoute from './components/PrivateRoute';
+import AdminDashboard from './pages/AdminDashboard';
 
 function App() {
   return (
@@ -19,7 +21,8 @@ function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/register/passenger" element={<PassengerRegister />} />
+              <Route path="/register/driver" element={<DriverRegister />} />
               <Route 
                 path="/request-ride" 
                 element={
@@ -33,6 +36,14 @@ function App() {
                 element={
                   <PrivateRoute>
                     <DriverDashboard />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/admin" 
+                element={
+                  <PrivateRoute roles={['admin']}>
+                    <AdminDashboard />
                   </PrivateRoute>
                 } 
               />

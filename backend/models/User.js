@@ -14,14 +14,34 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  role: {
-    type: String,
-    enum: ['user', 'driver', 'admin_master', 'admin_financeiro', 'suporte'],
-    default: 'user'
-  },
   phone: {
     type: String,
     required: true
+  },
+  role: {
+    type: String,
+    enum: ['user', 'driver', 'admin'],
+    default: 'user'
+  },
+  vehicle: {
+    model: String,
+    plate: String,
+    year: String,
+    color: String
+  },
+  documents: {
+    cnh: String,
+    cpf: String
+  },
+  isApproved: {
+    type: Boolean,
+    default: function() {
+      return this.role === 'user'; // Passageiros são aprovados automaticamente
+    }
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   },
   isAvailable: {
     type: Boolean,

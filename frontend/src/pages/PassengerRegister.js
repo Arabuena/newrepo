@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../services/auth';
 
-export default function RegisterPage() {
+export default function PassengerRegister() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
@@ -35,12 +35,12 @@ export default function RegisterPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Crie sua conta
+            Cadastro de Passageiro
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Ou{' '}
-            <Link to="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-              faça login se já tiver uma conta
+            <Link to="/register/driver" className="font-medium text-indigo-600 hover:text-indigo-500">
+              cadastre-se como motorista
             </Link>
           </p>
         </div>
@@ -85,22 +85,11 @@ export default function RegisterPage() {
                 name="phone"
                 type="tel"
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Telefone"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               />
-            </div>
-            <div>
-              <select
-                name="role"
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-              >
-                <option value="user">Passageiro</option>
-                <option value="driver">Motorista</option>
-              </select>
             </div>
           </div>
 

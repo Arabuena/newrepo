@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { register, login } = require('../controllers/authController');
+const { register, login, getProfile } = require('../controllers/authController');
 const { check } = require('express-validator');
+const auth = require('../middleware/auth');
 
 // Validação para registro
 const registerValidation = [
@@ -18,7 +19,11 @@ const loginValidation = [
   check('password', 'Senha é obrigatória').exists()
 ];
 
+// Rotas públicas
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
+
+// Rotas protegidas
+router.get('/profile', auth, getProfile);
 
 module.exports = router; 
