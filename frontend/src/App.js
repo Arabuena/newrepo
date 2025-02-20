@@ -26,7 +26,7 @@ function App() {
               <Route 
                 path="/request-ride" 
                 element={
-                  <PrivateRoute>
+                  <PrivateRoute roles={['passenger']}>
                     <RequestRide />
                   </PrivateRoute>
                 } 

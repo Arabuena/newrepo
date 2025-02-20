@@ -19,7 +19,7 @@ export default function LoginPage() {
 
     try {
       const user = await login(formData.email, formData.password);
-      console.log('Login successful:', user); // Para debug
+      console.log('Login successful:', user);
       
       if (user.role === 'admin') {
         navigate('/admin');
@@ -29,7 +29,7 @@ export default function LoginPage() {
         navigate('/request-ride');
       }
     } catch (err) {
-      console.error('Login error:', err); // Para debug
+      console.error('Login error:', err);
       setError(err.toString());
     } finally {
       setLoading(false);

@@ -1,43 +1,38 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { GoogleMap, LoadScript, Marker, DirectionsRenderer } from '@react-google-maps/api';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import api from '../services/api';
+
+const GOOGLE_MAPS_API_KEY = 'AIzaSyAVe7W-B0zZa-6ePrcLfZkDzs1RGRSHSCc';
+
+const mapContainerStyle = {
+  width: '100%',
+  height: '400px'
+};
 
 export default function RequestRide() {
   const [origin, setOrigin] = useState(null);
   const [destination, setDestination] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [directions, setDirections] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const mapRef = useRef(null);
-  const mapInstanceRef = useRef(null);
-  const directionsRendererRef = useRef(null);
 
   useEffect(() => {
-    // Inicializa o mapa
-    if (!mapInstanceRef.current && window.google) {
+    // Pega localização atual
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
-          
-          mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-            center: { lat: latitude, lng: longitude },
-            zoom: 15,
-            disableDefaultUI: true,
-            zoomControl: true
-          });
-
-          directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
-            map: mapInstanceRef.current,
-            suppressMarkers: true
-          });
+          const location = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          };
+          setCurrentLocation(location);
+          setOrigin(location); // Define a localização atual como origem
         },
-        () => {
-          // Fallback para São Paulo se não conseguir localização
-          mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-            center: { lat: -23.550520, lng: -46.633308 },
-            zoom: 12,
-            disableDefaultUI: true,
-            zoomControl: true
-          });
+        (error) => {
+          console.error('Erro ao obter localização:', error);
+          setError('Não foi possível obter sua localização');
         }
       );
     }
@@ -45,18 +40,20 @@ export default function RequestRide() {
 
   // Atualiza rota quando origem ou destino mudam
   useEffect(() => {
-    if (origin && destination && mapInstanceRef.current) {
+    if (origin && destination && window.google) {
       const directionsService = new window.google.maps.DirectionsService();
 
       directionsService.route(
         {
-          origin: new window.google.maps.LatLng(origin.lat, origin.lng),
-          destination: new window.google.maps.LatLng(destination.lat, destination.lng),
+          origin: origin,
+          destination: destination,
           travelMode: window.google.maps.TravelMode.DRIVING,
         },
         (result, status) => {
           if (status === 'OK') {
-            directionsRendererRef.current.setDirections(result);
+            setDirections(result);
+          } else {
+            console.error('Erro ao calcular rota:', status);
           }
         }
       );
@@ -88,48 +85,57 @@ export default function RequestRide() {
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* Mapa */}
-      <div ref={mapRef} className="flex-1 w-full h-2/3" />
+    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+      <div className="px-4 py-6 sm:px-0">
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Solicitar Corrida
+        </h1>
 
-      {/* Formulário */}
-      <div className="bg-white shadow-lg rounded-t-3xl -mt-6 relative z-10 p-6">
-        <div className="max-w-xl mx-auto">
-          <h1 className="text-xl font-semibold text-gray-900 mb-4">
-            Para onde vamos?
-          </h1>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <AddressAutocomplete
-                placeholder="Origem"
-                onSelect={setOrigin}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <AddressAutocomplete
-                placeholder="Destino"
-                onSelect={setDestination}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            {error && (
-              <div className="text-red-500 text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading || !origin || !destination}
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+        <div className="mt-6">
+          <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              zoom={14}
+              center={currentLocation || { lat: -23.550520, lng: -46.633308 }}
             >
-              {loading ? 'Solicitando...' : 'Solicitar Corrida'}
-            </button>
-          </form>
+              {currentLocation && <Marker position={currentLocation} />}
+              {directions && <DirectionsRenderer directions={directions} />}
+            </GoogleMap>
+
+            <div className="mt-6 bg-white shadow-lg rounded-lg p-6">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                  <AddressAutocomplete
+                    placeholder="Origem"
+                    onSelect={setOrigin}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <AddressAutocomplete
+                    placeholder="Destino"
+                    onSelect={setDestination}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+
+                {error && (
+                  <div className="text-red-500 text-sm">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading || !origin || !destination}
+                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                >
+                  {loading ? 'Solicitando...' : 'Solicitar Corrida'}
+                </button>
+              </form>
+            </div>
+          </LoadScript>
         </div>
       </div>
     </div>

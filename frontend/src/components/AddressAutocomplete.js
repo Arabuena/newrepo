@@ -1,40 +1,35 @@
 import React, { useEffect, useRef } from 'react';
 
-export default function AddressAutocomplete({ onSelect, placeholder, className }) {
+export default function AddressAutocomplete({ placeholder, onSelect, className }) {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
 
   useEffect(() => {
     if (!window.google) {
-      console.error('Google Maps JavaScript API não está carregada');
+      console.error('Google Maps não está carregado');
       return;
     }
 
     // Inicializa o autocomplete
-    autocompleteRef.current = new window.google.maps.places.Autocomplete(
-      inputRef.current,
-      {
-        componentRestrictions: { country: 'BR' },
-        fields: ['address_components', 'geometry', 'name', 'formatted_address'],
-      }
-    );
+    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+      componentRestrictions: { country: 'br' },
+      fields: ['geometry', 'formatted_address']
+    });
 
     // Adiciona listener para quando um lugar é selecionado
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
       
       if (!place.geometry) {
-        console.log('Nenhum local encontrado');
+        console.error('Lugar selecionado não tem geometria');
         return;
       }
 
-      const addressData = {
-        address: place.formatted_address,
+      onSelect({
         lat: place.geometry.location.lat(),
-        lng: place.geometry.location.lng()
-      };
-
-      onSelect(addressData);
+        lng: place.geometry.location.lng(),
+        address: place.formatted_address
+      });
     });
 
     // Cleanup
