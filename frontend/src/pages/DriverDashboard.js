@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
+import { LoadScript } from '@react-google-maps/api';
+
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -17,14 +20,18 @@ export default function DriverDashboard() {
   const pollIntervalRef = useRef(null);
   const showHideIntervalRef = useRef(null);
   const currentTimerRef = useRef(null);
+  const [currentRoute, setCurrentRoute] = useState(null);
+  const [directionsRenderer, setDirectionsRenderer] = useState(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
   
   // Constantes para os tempos
   const SHOW_TIME = 15000; // 15 segundos
   const HIDE_TIME = 10000; // 10 segundos
 
-  // Inicializa o mapa
-  useEffect(() => {
-    if (!mapInstanceRef.current && window.google) {
+  // Função para quando o Google Maps carregar
+  const handleMapsLoaded = () => {
+    setMapsLoaded(true);
+    if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
@@ -47,7 +54,7 @@ export default function DriverDashboard() {
         }
       );
     }
-  }, []);
+  };
 
   // Atualiza localização periodicamente
   useEffect(() => {
@@ -204,6 +211,11 @@ export default function DriverDashboard() {
   const handleAcceptRide = async () => {
     if (!availableRide) return;
 
+    if (!mapsLoaded || !mapInstanceRef.current) {
+      setError('Aguarde o mapa carregar...');
+      return;
+    }
+
     if (currentTimerRef.current) {
       clearTimeout(currentTimerRef.current);
       currentTimerRef.current = null;
@@ -214,23 +226,72 @@ export default function DriverDashboard() {
       setCurrentRide(response.data);
       setAvailableRide(null);
 
-      // Adiciona rota ao mapa
-      if (window.google && mapInstanceRef.current) {
-        const directionsService = new window.google.maps.DirectionsService();
-        const directionsRenderer = new window.google.maps.DirectionsRenderer();
-        directionsRenderer.setMap(mapInstanceRef.current);
-
-        const result = await directionsService.route({
-          origin: { lat: response.data.origin.lat, lng: response.data.origin.lng },
-          destination: { lat: response.data.destination.lat, lng: response.data.destination.lng },
-          travelMode: window.google.maps.TravelMode.DRIVING
+      // Cria o DirectionsRenderer se não existir
+      let renderer = directionsRenderer;
+      if (!renderer) {
+        renderer = new window.google.maps.DirectionsRenderer({
+          map: mapInstanceRef.current,
+          suppressMarkers: true
         });
-
-        directionsRenderer.setDirections(result);
+        setDirectionsRenderer(renderer);
       }
+
+      // Limpa marcadores existentes
+      if (markerRef.current) {
+        markerRef.current.setMap(null);
+      }
+
+      // Coordenadas do motorista e passageiro
+      const driverCoords = response.data.driver.location.coordinates;
+      const originCoords = response.data.origin.coordinates;
+
+      // Calcula e exibe a rota até o passageiro
+      const directionsService = new window.google.maps.DirectionsService();
+      const result = await directionsService.route({
+        origin: { 
+          lat: driverCoords[1], 
+          lng: driverCoords[0] 
+        },
+        destination: { 
+          lat: originCoords[1], 
+          lng: originCoords[0] 
+        },
+        travelMode: window.google.maps.TravelMode.DRIVING
+      });
+
+      renderer.setDirections(result);
+      setCurrentRoute(result);
+
+      // Adiciona marcadores personalizados
+      new window.google.maps.Marker({
+        position: { 
+          lat: driverCoords[1], 
+          lng: driverCoords[0] 
+        },
+        map: mapInstanceRef.current,
+        icon: {
+          url: '/car-icon.png',
+          scaledSize: new window.google.maps.Size(32, 32)
+        },
+        title: 'Sua localização'
+      });
+
+      new window.google.maps.Marker({
+        position: { 
+          lat: originCoords[1], 
+          lng: originCoords[0] 
+        },
+        map: mapInstanceRef.current,
+        icon: {
+          url: '/passenger-icon.png',
+          scaledSize: new window.google.maps.Size(32, 32)
+        },
+        title: 'Local de embarque'
+      });
+
     } catch (error) {
+      console.error('Erro ao aceitar corrida:', error);
       setError('Erro ao aceitar corrida');
-      console.error(error);
     }
   };
 
@@ -243,99 +304,202 @@ export default function DriverDashboard() {
     setAvailableRide(null);
   };
 
-  return (
-    <div className="h-full flex flex-col relative">
-      {/* Mapa */}
-      <div ref={mapRef} className="flex-1 w-full" />
+  // Adicione esta função junto com as outras funções do componente
+  const handleStartRide = async (rideId) => {
+    try {
+      const response = await api.post(`/rides/start/${rideId}`);
+      setCurrentRide(response.data);
 
-      {/* Status Bar */}
-      <div className="absolute top-0 left-0 right-0 bg-white shadow-lg z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-2 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
-              <span className="text-sm font-medium">{isOnline ? 'Online' : 'Offline'}</span>
+      // Atualiza a rota para o destino final
+      if (directionsRenderer) {
+        const directionsService = new window.google.maps.DirectionsService();
+        const result = await directionsService.route({
+          origin: { 
+            lat: response.data.origin.coordinates[1], 
+            lng: response.data.origin.coordinates[0] 
+          },
+          destination: { 
+            lat: response.data.destination.coordinates[1], 
+            lng: response.data.destination.coordinates[0] 
+          },
+          travelMode: window.google.maps.TravelMode.DRIVING
+        });
+
+        directionsRenderer.setDirections(result);
+        setCurrentRoute(result);
+      }
+    } catch (error) {
+      setError('Erro ao iniciar corrida');
+      console.error(error);
+    }
+  };
+
+  // Adicione este componente para mostrar os detalhes da corrida atual
+  const CurrentRideDetails = ({ ride }) => {
+    if (!ride) return null;
+
+    return (
+      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg rounded-t-3xl p-6 animate-slide-up z-30">
+        <div className="max-w-xl mx-auto">
+          <h3 className="text-lg font-semibold mb-4">Corrida em Andamento</h3>
+          
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Passageiro:</span> {ride.passenger.name}
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                <span className="font-medium">Telefone:</span> {ride.passenger.phone}
+              </p>
             </div>
-            <div className="text-lg font-semibold">
-              R$ {earnings}
+
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Local de Embarque:</span> {ride.origin.address}
+              </p>
+              <p className="text-sm text-gray-600 mt-2">
+                <span className="font-medium">Destino:</span> {ride.destination.address}
+              </p>
             </div>
-          </div>
-          <button
-            onClick={handleStatusToggle}
-            className={`px-4 py-2 rounded-full text-white text-sm font-medium ${
-              isOnline ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
-            }`}
-          >
-            {isOnline ? 'Ficar Offline' : 'Ficar Online'}
-          </button>
-        </div>
-      </div>
 
-      {/* Debug info com mais detalhes - Ajustado para top-32 (era top-24) */}
-      <div className="fixed top-32 right-4 bg-white p-2 rounded shadow z-20">
-        <p>Online: {isOnline ? 'Sim' : 'Não'}</p>
-        <p>Corrida disponível: {availableRide ? 'Sim' : 'Não'}</p>
-        <p>Timer ativo: {currentTimerRef.current ? 'Sim' : 'Não'}</p>
-      </div>
-
-      {/* Notificação de Corrida Disponível */}
-      {availableRide && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg rounded-t-3xl p-6 animate-slide-up z-30">
-          <div className="max-w-xl mx-auto">
-            <h3 className="text-lg font-semibold mb-4">Nova solicitação de corrida!</h3>
-            <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  <span className="font-medium">Origem:</span> {availableRide.origin.address}
-                </p>
-                <p className="text-sm text-gray-600 mt-2">
-                  <span className="font-medium">Destino:</span> {availableRide.destination.address}
+                <p className="text-sm font-medium text-gray-500">Distância</p>
+                <p className="text-sm text-gray-900">{(ride.distance / 1000).toFixed(1)} km</p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm font-medium text-gray-500">Tempo est.</p>
+                <p className="text-sm text-gray-900">{Math.round(ride.duration / 60)} min</p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm font-medium text-gray-500">Valor</p>
+                <p className="text-lg font-semibold text-green-600">
+                  R$ {ride.price.toFixed(2)}
                 </p>
               </div>
+            </div>
 
-              <div className="grid grid-cols-3 gap-4">
+            <div className="flex space-x-3">
+              <a
+                href={`tel:${ride.passenger.phone}`}
+                className="flex-1 bg-green-500 text-white py-4 px-4 rounded-lg font-medium hover:bg-green-600 transition-colors text-center"
+              >
+                Ligar para Passageiro
+              </a>
+              <button
+                onClick={() => handleStartRide(ride._id)}
+                className="flex-1 bg-blue-500 text-white py-4 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors"
+              >
+                Iniciar Corrida
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <LoadScript
+      googleMapsApiKey={GOOGLE_MAPS_API_KEY}
+      onLoad={handleMapsLoaded}
+    >
+      <div className="h-full flex flex-col relative">
+        {/* Mapa */}
+        <div ref={mapRef} className="flex-1 w-full" />
+
+        {/* Status Bar */}
+        <div className="absolute top-0 left-0 right-0 bg-white shadow-lg z-10">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <div className={`w-3 h-3 rounded-full mr-2 ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+                <span className="text-sm font-medium">{isOnline ? 'Online' : 'Offline'}</span>
+              </div>
+              <div className="text-lg font-semibold">
+                R$ {earnings}
+              </div>
+            </div>
+            <button
+              onClick={handleStatusToggle}
+              className={`px-4 py-2 rounded-full text-white text-sm font-medium ${
+                isOnline ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+              }`}
+            >
+              {isOnline ? 'Ficar Offline' : 'Ficar Online'}
+            </button>
+          </div>
+        </div>
+
+        {/* Debug info com mais detalhes - Ajustado para top-32 (era top-24) */}
+        <div className="fixed top-32 right-4 bg-white p-2 rounded shadow z-20">
+          <p>Online: {isOnline ? 'Sim' : 'Não'}</p>
+          <p>Corrida disponível: {availableRide ? 'Sim' : 'Não'}</p>
+          <p>Timer ativo: {currentTimerRef.current ? 'Sim' : 'Não'}</p>
+        </div>
+
+        {/* Notificação de Corrida Disponível */}
+        {availableRide && (
+          <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg rounded-t-3xl p-6 animate-slide-up z-30">
+            <div className="max-w-xl mx-auto">
+              <h3 className="text-lg font-semibold mb-4">Nova solicitação de corrida!</h3>
+              <div className="space-y-4">
                 <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-gray-500">Distância</p>
-                  <p className="text-sm text-gray-900">{(availableRide.distance / 1000).toFixed(1)} km</p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-gray-500">Tempo est.</p>
-                  <p className="text-sm text-gray-900">{Math.round(availableRide.duration / 60)} min</p>
-                </div>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-sm font-medium text-gray-500">Valor</p>
-                  <p className="text-lg font-semibold text-green-600">
-                    R$ {availableRide.price.toFixed(2)}
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">Origem:</span> {availableRide.origin.address}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-2">
+                    <span className="font-medium">Destino:</span> {availableRide.destination.address}
                   </p>
                 </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Distância</p>
+                    <p className="text-sm text-gray-900">{(availableRide.distance / 1000).toFixed(1)} km</p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Tempo est.</p>
+                    <p className="text-sm text-gray-900">{Math.round(availableRide.duration / 60)} min</p>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-sm font-medium text-gray-500">Valor</p>
+                    <p className="text-lg font-semibold text-green-600">
+                      R$ {availableRide.price.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6">
+                <button
+                  onClick={handleAcceptRide}
+                  className="flex-1 bg-green-500 text-white py-4 px-4 rounded-lg font-medium hover:bg-green-600 transition-colors"
+                >
+                  Aceitar Corrida
+                </button>
+                <button
+                  onClick={handleDeclineRide}
+                  className="flex-1 bg-gray-200 text-gray-800 py-4 px-4 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                >
+                  Recusar
+                </button>
               </div>
             </div>
+          </div>
+        )}
 
-            <div className="flex space-x-3 mt-6">
-              <button
-                onClick={handleAcceptRide}
-                className="flex-1 bg-green-500 text-white py-4 px-4 rounded-lg font-medium hover:bg-green-600 transition-colors"
-              >
-                Aceitar Corrida
-              </button>
-              <button
-                onClick={handleDeclineRide}
-                className="flex-1 bg-gray-200 text-gray-800 py-4 px-4 rounded-lg font-medium hover:bg-gray-300 transition-colors"
-              >
-                Recusar
-              </button>
+        {/* Detalhes da corrida atual */}
+        {currentRide && <CurrentRideDetails ride={currentRide} />}
+
+        {error && (
+          <div className="fixed top-20 left-0 right-0 mx-4 z-40">
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+              {error}
             </div>
           </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="fixed top-20 left-0 right-0 mx-4 z-40">
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-            {error}
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </LoadScript>
   );
 } 

@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
-// Configuração para remover os warnings
+// Configuração dos flags do React Router v7
 window.ROUTER_FUTURE_FLAGS = {
   v7_startTransition: true,
   v7_relativeSplatPath: true

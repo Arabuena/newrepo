@@ -9,7 +9,8 @@ const {
   acceptRide,
   completeRide,
   cancelRide,
-  getNearbyDrivers
+  getNearbyDrivers,
+  startRide
 } = require('../controllers/rideController');
 
 router.post('/request', auth, requestRide);
@@ -17,6 +18,7 @@ router.post('/accept/:rideId', auth, acceptRide);
 router.post('/complete/:rideId', auth, completeRide);
 router.post('/cancel/:rideId', auth, cancelRide);
 router.get('/nearby-drivers', auth, getNearbyDrivers);
+router.post('/start/:rideId', auth, startRide);
 
 // Rota para buscar corridas disponíveis
 router.get('/available', auth, async (req, res) => {

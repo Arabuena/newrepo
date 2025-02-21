@@ -91,19 +91,33 @@ exports.getNearbyDrivers = async (req, res) => {
 
 exports.acceptRide = async (req, res) => {
   try {
-    const ride = await Ride.findById(req.params.rideId);
+    const ride = await Ride.findById(req.params.rideId)
+      .populate('passenger', 'name phone');
+    
     if (!ride) {
       return res.status(404).json({ message: 'Corrida não encontrada' });
     }
 
+    if (ride.status !== 'pending') {
+      return res.status(400).json({ message: 'Esta corrida não está mais disponível' });
+    }
+
+    // Atualiza a corrida com os dados do motorista
     ride.driver = req.user.id;
     ride.status = 'accepted';
     await ride.save();
 
-    // Aqui você pode implementar notificação ao passageiro
+    // Busca os dados completos do motorista
+    const driver = await User.findById(req.user.id);
 
-    res.json(ride);
+    // Retorna a corrida com todos os dados necessários
+    const fullRide = await Ride.findById(ride._id)
+      .populate('passenger', 'name phone')
+      .populate('driver', 'name phone vehicle location');
+
+    res.json(fullRide);
   } catch (error) {
+    console.error('Erro ao aceitar corrida:', error);
     res.status(500).json({ message: 'Erro ao aceitar corrida' });
   }
 };
@@ -141,5 +155,29 @@ exports.cancelRide = async (req, res) => {
     res.json(ride);
   } catch (error) {
     res.status(500).json({ message: 'Erro ao cancelar corrida' });
+  }
+};
+
+exports.startRide = async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.rideId)
+      .populate('passenger', 'name phone')
+      .populate('driver', 'name phone vehicle location');
+
+    if (!ride) {
+      return res.status(404).json({ message: 'Corrida não encontrada' });
+    }
+
+    if (ride.status !== 'accepted') {
+      return res.status(400).json({ message: 'Corrida não pode ser iniciada' });
+    }
+
+    ride.status = 'in_progress';
+    await ride.save();
+
+    res.json(ride);
+  } catch (error) {
+    console.error('Erro ao iniciar corrida:', error);
+    res.status(500).json({ message: 'Erro ao iniciar corrida' });
   }
 }; 
