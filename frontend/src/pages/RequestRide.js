@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GoogleMap, LoadScript, Marker, DirectionsRenderer } from '@react-google-maps/api';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import api from '../services/api';
+import RideStatus from '../components/RideStatus';
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAVe7W-B0zZa-6ePrcLfZkDzs1RGRSHSCc';
 
@@ -17,6 +18,10 @@ export default function RequestRide() {
   const [directions, setDirections] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [price, setPrice] = useState(null);
+  const [distance, setDistance] = useState(null);
+  const [duration, setDuration] = useState(null);
+  const [currentRide, setCurrentRide] = useState(null);
 
   useEffect(() => {
     // Pega localização atual
@@ -52,8 +57,26 @@ export default function RequestRide() {
         (result, status) => {
           if (status === 'OK') {
             setDirections(result);
+            
+            // Pega distância e duração
+            const route = result.routes[0];
+            const leg = route.legs[0];
+            setDistance(leg.distance.value); // metros
+            setDuration(leg.duration.value); // segundos
+
+            // Calcula preço estimado
+            const basePrice = 2;
+            const pricePerKm = 2;
+            const pricePerMin = 0.25;
+            
+            const distancePrice = (leg.distance.value / 1000) * pricePerKm;
+            const durationPrice = (leg.duration.value / 60) * pricePerMin;
+            const totalPrice = basePrice + distancePrice + durationPrice;
+            
+            setPrice(Math.round(totalPrice * 100) / 100);
           } else {
             console.error('Erro ao calcular rota:', status);
+            setError('Erro ao calcular rota');
           }
         }
       );
@@ -71,16 +94,29 @@ export default function RequestRide() {
     setError('');
 
     try {
-      await api.post('/rides/request', {
+      const response = await api.post('/rides/request', {
         origin,
-        destination
+        destination,
+        distance,
+        duration
       });
-      alert('Corrida solicitada com sucesso!');
+
+      setCurrentRide(response.data.ride);
     } catch (err) {
       setError('Erro ao solicitar corrida');
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelRide = async () => {
+    try {
+      await api.post(`/rides/cancel/${currentRide._id}`);
+      setCurrentRide(null);
+    } catch (err) {
+      setError('Erro ao cancelar corrida');
+      console.error(err);
     }
   };
 
@@ -120,6 +156,32 @@ export default function RequestRide() {
                   />
                 </div>
 
+                {price && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="text-lg font-medium text-gray-900">Detalhes da viagem</h3>
+                    <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Distância</dt>
+                        <dd className="mt-1 text-sm text-gray-900">
+                          {(distance / 1000).toFixed(1)} km
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Tempo estimado</dt>
+                        <dd className="mt-1 text-sm text-gray-900">
+                          {Math.round(duration / 60)} min
+                        </dd>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <dt className="text-sm font-medium text-gray-500">Preço estimado</dt>
+                        <dd className="mt-1 text-2xl font-semibold text-gray-900">
+                          R$ {price.toFixed(2)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                )}
+
                 {error && (
                   <div className="text-red-500 text-sm">
                     {error}
@@ -137,6 +199,13 @@ export default function RequestRide() {
             </div>
           </LoadScript>
         </div>
+
+        {currentRide && (
+          <RideStatus 
+            ride={currentRide} 
+            onCancel={handleCancelRide}
+          />
+        )}
       </div>
     </div>
   );

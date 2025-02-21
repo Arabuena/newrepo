@@ -4,36 +4,63 @@ const User = require('../models/User');
 exports.requestRide = async (req, res) => {
   try {
     const {
-      originCoordinates,
-      originAddress,
-      destinationCoordinates,
-      destinationAddress,
-      price,
+      origin,
+      destination,
       distance,
       duration
     } = req.body;
 
+    console.log('=== DEBUG NOVA CORRIDA ===');
+    console.log('Dados recebidos:');
+    console.log('Origem:', origin);
+    console.log('Destino:', destination);
+    console.log('Distância:', distance);
+    console.log('Duração:', duration);
+
+    // Calcula o preço
+    const basePrice = 2;
+    const pricePerKm = 2;
+    const pricePerMin = 0.25;
+    
+    const distancePrice = (distance / 1000) * pricePerKm;
+    const durationPrice = (duration / 60) * pricePerMin;
+    const totalPrice = basePrice + distancePrice + durationPrice;
+
+    // Cria a corrida
     const ride = new Ride({
       passenger: req.user.id,
       origin: {
-        coordinates: originCoordinates,
-        address: originAddress
+        type: 'Point',
+        coordinates: [origin.lng, origin.lat],
+        address: origin.address
       },
       destination: {
-        coordinates: destinationCoordinates,
-        address: destinationAddress
+        type: 'Point',
+        coordinates: [destination.lng, destination.lat],
+        address: destination.address
       },
-      price,
-      distance,
-      duration
+      price: Math.round(totalPrice * 100) / 100,
+      distance: Math.round(distance),
+      duration: Math.round(duration),
+      status: 'pending'
     });
 
     await ride.save();
 
-    // Aqui você pode implementar a lógica para notificar motoristas próximos
-    
-    res.status(201).json(ride);
+    console.log('\nCorrida criada:');
+    console.log(ride);
+    console.log('=== FIM DEBUG ===\n');
+
+    res.status(201).json({
+      ride,
+      estimatedDrivers: await User.countDocuments({
+        role: 'driver',
+        isAvailable: true,
+        isApproved: true
+      })
+    });
   } catch (error) {
+    console.error('Erro ao solicitar corrida:', error);
     res.status(500).json({ message: 'Erro ao solicitar corrida' });
   }
 };

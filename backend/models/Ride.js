@@ -18,7 +18,15 @@ const rideSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: true
+      required: true,
+      validate: {
+        validator: function(v) {
+          return v.length === 2 && 
+                 v[0] >= -180 && v[0] <= 180 && 
+                 v[1] >= -90 && v[1] <= 90;
+        },
+        message: 'Coordenadas inválidas'
+      }
     },
     address: String
   },
@@ -30,7 +38,15 @@ const rideSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: true
+      required: true,
+      validate: {
+        validator: function(v) {
+          return v.length === 2 && 
+                 v[0] >= -180 && v[0] <= 180 && 
+                 v[1] >= -90 && v[1] <= 90;
+        },
+        message: 'Coordenadas inválidas'
+      }
     },
     address: String
   },
@@ -54,8 +70,5 @@ const rideSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
-
-rideSchema.index({ origin: '2dsphere' });
-rideSchema.index({ destination: '2dsphere' });
 
 module.exports = mongoose.model('Ride', rideSchema); 
