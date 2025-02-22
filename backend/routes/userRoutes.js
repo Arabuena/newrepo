@@ -117,4 +117,19 @@ router.get('/me', auth, async (req, res) => {
   }
 });
 
+// Listar usuários (apenas para admin)
+router.get('/', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Acesso negado' });
+    }
+
+    const users = await User.find({}, 'name email role');
+    res.json(users);
+  } catch (error) {
+    console.error('Erro ao listar usuários:', error);
+    res.status(500).json({ message: 'Erro ao listar usuários' });
+  }
+});
+
 module.exports = router; 
