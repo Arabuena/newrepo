@@ -3,6 +3,7 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
 const User = require('../models/User');
+const { getAllRides, deleteRide } = require('../controllers/adminController');
 
 // Middleware para verificar se é admin
 router.use(auth, admin);
@@ -77,5 +78,9 @@ router.get('/stats', async (req, res) => {
     res.status(500).json({ message: 'Erro ao buscar estatísticas' });
   }
 });
+
+// Rotas de corridas
+router.get('/rides', getAllRides);
+router.delete('/rides/:rideId', deleteRide);
 
 module.exports = router; 

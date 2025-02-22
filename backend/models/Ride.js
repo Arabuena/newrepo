@@ -18,15 +18,7 @@ const rideSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: true,
-      validate: {
-        validator: function(v) {
-          return v.length === 2 && 
-                 v[0] >= -180 && v[0] <= 180 && 
-                 v[1] >= -90 && v[1] <= 90;
-        },
-        message: 'Coordenadas inválidas'
-      }
+      required: true
     },
     address: String
   },
@@ -38,15 +30,7 @@ const rideSchema = new mongoose.Schema({
     },
     coordinates: {
       type: [Number],
-      required: true,
-      validate: {
-        validator: function(v) {
-          return v.length === 2 && 
-                 v[0] >= -180 && v[0] <= 180 && 
-                 v[1] >= -90 && v[1] <= 90;
-        },
-        message: 'Coordenadas inválidas'
-      }
+      required: true
     },
     address: String
   },
@@ -55,20 +39,18 @@ const rideSchema = new mongoose.Schema({
     enum: ['pending', 'accepted', 'in_progress', 'completed', 'cancelled'],
     default: 'pending'
   },
-  price: {
-    type: Number,
-    required: true
-  },
-  distance: {
-    type: Number,
-    required: true
-  },
-  duration: {
-    type: Number,
-    required: true
+  distance: Number,
+  duration: Number,
+  price: Number,
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-module.exports = mongoose.model('Ride', rideSchema); 
+// Adiciona índices geoespaciais
+rideSchema.index({ 'origin.coordinates': '2dsphere' });
+rideSchema.index({ 'destination.coordinates': '2dsphere' });
+
+// Exporta o modelo apenas se ainda não existir
+module.exports = mongoose.models.Ride || mongoose.model('Ride', rideSchema); 

@@ -1,93 +1,133 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
-const Ride = require('../models/Ride');
-const User = require('../models/User');
-
 const {
   requestRide,
+  getAvailableRides,
   acceptRide,
+  startRide,
   completeRide,
   cancelRide,
-  getNearbyDrivers,
-  startRide
+  getCurrentRide
 } = require('../controllers/rideController');
+const Ride = require('../models/Ride');
 
-router.post('/request', auth, requestRide);
-router.post('/accept/:rideId', auth, acceptRide);
-router.post('/complete/:rideId', auth, completeRide);
-router.post('/cancel/:rideId', auth, cancelRide);
-router.get('/nearby-drivers', auth, getNearbyDrivers);
-router.post('/start/:rideId', auth, startRide);
+// Todas as rotas precisam de autenticação
+router.use(auth);
 
-// Rota para buscar corridas disponíveis
-router.get('/available', auth, async (req, res) => {
+// Rotas de corrida
+router.post('/request', requestRide);
+router.get('/available', getAvailableRides);
+router.post('/accept/:rideId', acceptRide);
+router.post('/start/:rideId', startRide);
+router.post('/complete/:rideId', completeRide);
+router.post('/cancel/:rideId', cancelRide);
+router.get('/current', getCurrentRide);
+
+router.post('/', auth, async (req, res) => {
   try {
-    // Verifica se é um motorista
-    if (req.user.role !== 'driver') {
-      return res.status(403).json({ message: 'Apenas motoristas podem buscar corridas' });
+    // Verifica se é um passageiro
+    if (req.user.role !== 'passenger') {
+      return res.status(403).json({ message: 'Apenas passageiros podem solicitar corridas' });
     }
 
-    // Busca corridas pendentes
-    const rides = await Ride.find({
-      status: 'pending',
-      driver: null
-    })
-    .populate('passenger', 'name phone')
-    .select('-__v')
-    .limit(1); // Pega apenas uma corrida por vez
+    const { origin, destination, distance, duration, price } = req.body;
 
-    console.log('=== DEBUG CORRIDAS ===');
-    console.log('Total de corridas encontradas:', rides.length);
-    console.log('Usuário:', req.user.name);
-    console.log('Role:', req.user.role);
-    
-    // Formata as corridas para o frontend
-    const formattedRides = rides.map(ride => ({
-      _id: ride._id,
+    // Log para debug
+    console.log('Criando corrida:', {
+      passenger: req.user.id,
+      origin,
+      destination,
+      distance,
+      duration,
+      price
+    });
+
+    // Valida os dados
+    if (!origin || !destination || !origin.coordinates || !destination.coordinates) {
+      return res.status(400).json({ 
+        message: 'Dados inválidos',
+        required: ['origin.coordinates', 'destination.coordinates']
+      });
+    }
+
+    // Cria a corrida
+    const ride = new Ride({
+      passenger: req.user.id,
       origin: {
-        address: ride.origin.address,
-        lat: ride.origin.coordinates[1],
-        lng: ride.origin.coordinates[0]
+        type: 'Point',
+        coordinates: origin.coordinates,
+        address: origin.address
       },
       destination: {
-        address: ride.destination.address,
-        lat: ride.destination.coordinates[1],
-        lng: ride.destination.coordinates[0]
+        type: 'Point',
+        coordinates: destination.coordinates,
+        address: destination.address
       },
-      price: ride.price,
-      distance: ride.distance,
-      duration: ride.duration,
-      passenger: {
-        id: ride.passenger._id,
-        name: ride.passenger.name,
-        phone: ride.passenger.phone
-      }
-    }));
+      distance,
+      duration,
+      price,
+      status: 'pending'
+    });
 
-    console.log('Corridas formatadas:', formattedRides);
-    console.log('=== FIM DEBUG ===\n');
+    await ride.save();
 
-    res.json(formattedRides);
+    // Retorna a corrida criada
+    res.status(201).json(ride);
   } catch (error) {
-    console.error('Erro ao buscar corridas disponíveis:', error);
-    res.status(500).json({ message: 'Erro ao buscar corridas disponíveis' });
+    console.error('Erro ao criar corrida:', error);
+    res.status(500).json({ 
+      message: 'Erro ao criar corrida',
+      error: error.message 
+    });
   }
 });
 
-// Rota para verificar status da corrida
-router.get('/status/:rideId', auth, async (req, res) => {
+// Rota para buscar uma corrida específica
+router.get('/:rideId', auth, async (req, res) => {
   try {
-    const ride = await require('../models/Ride').findById(req.params.rideId)
-      .populate('driver', 'name phone vehicle')
-      .select('-__v');
+    const ride = await Ride.findById(req.params.rideId)
+      .populate('passenger', 'name')
+      .populate('driver', 'name');
 
     if (!ride) {
       return res.status(404).json({ message: 'Corrida não encontrada' });
     }
 
+    // Verifica se o usuário tem permissão para ver esta corrida
+    if (ride.passenger._id.toString() !== req.user.id && 
+        (!ride.driver || ride.driver._id.toString() !== req.user.id)) {
+      return res.status(403).json({ message: 'Sem permissão para ver esta corrida' });
+    }
+
     res.json(ride);
   } catch (error) {
+    console.error('Erro ao buscar corrida:', error);
+    res.status(500).json({ message: 'Erro ao buscar corrida' });
+  }
+});
+
+// Rota para buscar o status de uma corrida
+router.get('/status/:rideId', auth, async (req, res) => {
+  try {
+    const ride = await Ride.findById(req.params.rideId)
+      .populate('passenger', 'name')
+      .populate('driver', 'name')
+      .select('status origin destination driver passenger createdAt');
+
+    if (!ride) {
+      return res.status(404).json({ message: 'Corrida não encontrada' });
+    }
+
+    // Verifica se o usuário tem permissão para ver esta corrida
+    if (ride.passenger._id.toString() !== req.user.id && 
+        (!ride.driver || ride.driver._id.toString() !== req.user.id)) {
+      return res.status(403).json({ message: 'Sem permissão para ver esta corrida' });
+    }
+
+    res.json(ride);
+  } catch (error) {
+    console.error('Erro ao buscar status da corrida:', error);
     res.status(500).json({ message: 'Erro ao buscar status da corrida' });
   }
 });

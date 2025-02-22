@@ -25,11 +25,14 @@ export default function AddressAutocomplete({ placeholder, onSelect, className }
         return;
       }
 
-      onSelect({
+      const location = {
         lat: place.geometry.location.lat(),
         lng: place.geometry.location.lng(),
-        address: place.formatted_address
-      });
+        formatted_address: place.formatted_address,
+        name: place.name
+      };
+
+      onSelect(location);
     });
 
     // Cleanup

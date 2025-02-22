@@ -56,32 +56,15 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log('Tentativa de login:', { email });
 
-    // Busca o usuário
     const user = await User.findOne({ email });
     if (!user) {
-      console.log('Usuário não encontrado:', email);
       return res.status(400).json({ message: 'Credenciais inválidas' });
     }
-    console.log('Usuário encontrado:', { email, role: user.role });
 
-    // Verifica a senha
     const validPassword = await bcrypt.compare(password, user.password);
-    console.log('Senha válida:', validPassword);
-    
     if (!validPassword) {
-      console.log('Senha inválida para:', email);
       return res.status(400).json({ message: 'Credenciais inválidas' });
-    }
-
-    console.log('Login successful:', { email, role: user.role }); // Debug
-
-    // Verifica se o motorista está aprovado
-    if (user.role === 'driver' && !user.isApproved) {
-      return res.status(403).json({ 
-        message: 'Sua conta ainda está em análise. Aguarde a aprovação.' 
-      });
     }
 
     // Gera o token JWT
@@ -90,6 +73,10 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
+
+    // Log para debug
+    console.log('Token gerado:', token);
+    console.log('JWT_SECRET usado:', process.env.JWT_SECRET);
 
     res.json({
       token,

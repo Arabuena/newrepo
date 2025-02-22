@@ -1,9 +1,9 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import api from '../services/api';
 
-const AuthContext = createContext(null);
+export const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
+export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,9 +24,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      console.log('Attempting login:', { email }); // Debug
+      console.log('Tentando login:', { email });
       const response = await api.post('/auth/login', { email, password });
-      console.log('Login response:', response.data); // Debug
+      console.log('Resposta do login:', response.data);
 
       const { token, user } = response.data;
       
@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
       
       return user;
     } catch (error) {
-      console.error('Login error:', error.response?.data || error); // Debug
+      console.error('Erro no login:', error.response?.data || error);
       throw error.response?.data?.message || 'Erro ao fazer login';
     }
   };
@@ -55,11 +55,11 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

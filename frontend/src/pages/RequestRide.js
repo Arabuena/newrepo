@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { GoogleMap, LoadScript, Marker, DirectionsRenderer } from '@react-google-maps/api';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { GoogleMap, LoadScript, DirectionsRenderer } from '@react-google-maps/api';
 import AddressAutocomplete from '../components/AddressAutocomplete';
 import api from '../services/api';
 import RideStatus from '../components/RideStatus';
+import { useNavigate } from 'react-router-dom';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAVe7W-B0zZa-6ePrcLfZkDzs1RGRSHSCc';
+const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+const GOOGLE_MAPS_LIBRARIES = ['places'];
 
 const mapContainerStyle = {
   width: '100%',
@@ -22,10 +24,32 @@ export default function RequestRide() {
   const [distance, setDistance] = useState(null);
   const [duration, setDuration] = useState(null);
   const [currentRide, setCurrentRide] = useState(null);
+  const navigate = useNavigate();
+  const mapRef = useRef(null);
+
+  // Defina renderMarker usando useCallback antes de usá-lo
+  const renderMarker = useCallback((position) => {
+    if (!position || !window.google || !mapRef.current) return null;
+
+    return new window.google.maps.marker.AdvancedMarkerElement({
+      position,
+      title: "Sua localização",
+      map: mapRef.current
+    });
+  }, []);
+
+  const onMapLoad = useCallback((map) => {
+    mapRef.current = map;
+    
+    if (currentLocation) {
+      renderMarker(currentLocation);
+    }
+  }, [currentLocation, renderMarker]);
 
   useEffect(() => {
-    // Pega localização atual
-    if (navigator.geolocation) {
+    let marker = null;
+
+    if (navigator.geolocation && mapRef.current) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const location = {
@@ -33,7 +57,12 @@ export default function RequestRide() {
             lng: position.coords.longitude
           };
           setCurrentLocation(location);
-          setOrigin(location); // Define a localização atual como origem
+          setOrigin(location);
+
+          if (marker) {
+            marker.setMap(null);
+          }
+          marker = renderMarker(location);
         },
         (error) => {
           console.error('Erro ao obter localização:', error);
@@ -41,7 +70,13 @@ export default function RequestRide() {
         }
       );
     }
-  }, []);
+
+    return () => {
+      if (marker) {
+        marker.setMap(null);
+      }
+    };
+  }, [renderMarker]);
 
   // Atualiza rota quando origem ou destino mudam
   useEffect(() => {
@@ -83,28 +118,42 @@ export default function RequestRide() {
     }
   }, [origin, destination]);
 
-  const handleSubmit = async (e) => {
+  const handleRequestRide = async (e) => {
     e.preventDefault();
-    if (!origin || !destination) {
-      setError('Por favor, selecione origem e destino');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
+    
     try {
-      const response = await api.post('/rides/request', {
-        origin,
-        destination,
-        distance,
-        duration
-      });
+      if (!origin || !destination) {
+        setError('Selecione origem e destino');
+        return;
+      }
 
-      setCurrentRide(response.data.ride);
-    } catch (err) {
-      setError('Erro ao solicitar corrida');
-      console.error(err);
+      setLoading(true);
+      setError('');
+
+      const rideData = {
+        origin: {
+          coordinates: [origin.lng, origin.lat],
+          address: origin.formatted_address || origin.name
+        },
+        destination: {
+          coordinates: [destination.lng, destination.lat],
+          address: destination.formatted_address || destination.name
+        },
+        distance,
+        duration,
+        price
+      };
+
+      console.log('Enviando solicitação:', rideData);
+
+      const response = await api.post('/rides', rideData);
+      console.log('Corrida criada:', response.data);
+
+      // Redireciona para a página de acompanhamento
+      navigate(`/rides/${response.data._id}`);
+    } catch (error) {
+      console.error('Erro ao solicitar corrida:', error);
+      setError(error.response?.data?.message || 'Erro ao solicitar corrida');
     } finally {
       setLoading(false);
     }
@@ -121,92 +170,97 @@ export default function RequestRide() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-      <div className="px-4 py-6 sm:px-0">
-        <h1 className="text-2xl font-semibold text-gray-900">
-          Solicitar Corrida
-        </h1>
+    <div className="h-screen flex flex-col">
+      <LoadScript 
+        googleMapsApiKey={GOOGLE_MAPS_API_KEY}
+        libraries={GOOGLE_MAPS_LIBRARIES}
+      >
+        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <h1 className="text-2xl font-semibold text-gray-900">
+              Solicitar Corrida
+            </h1>
 
-        <div className="mt-6">
-          <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={['places']}>
-            <GoogleMap
-              mapContainerStyle={mapContainerStyle}
-              zoom={14}
-              center={currentLocation || { lat: -23.550520, lng: -46.633308 }}
-            >
-              {currentLocation && <Marker position={currentLocation} />}
-              {directions && <DirectionsRenderer directions={directions} />}
-            </GoogleMap>
+            <div className="mt-6">
+              <GoogleMap
+                mapContainerStyle={mapContainerStyle}
+                zoom={14}
+                center={currentLocation || { lat: -23.550520, lng: -46.633308 }}
+                onLoad={onMapLoad}
+              >
+                {directions && <DirectionsRenderer directions={directions} />}
+              </GoogleMap>
 
-            <div className="mt-6 bg-white shadow-lg rounded-lg p-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <AddressAutocomplete
-                    placeholder="Origem"
-                    onSelect={setOrigin}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <AddressAutocomplete
-                    placeholder="Destino"
-                    onSelect={setDestination}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                </div>
-
-                {price && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <h3 className="text-lg font-medium text-gray-900">Detalhes da viagem</h3>
-                    <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Distância</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
-                          {(distance / 1000).toFixed(1)} km
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-sm font-medium text-gray-500">Tempo estimado</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
-                          {Math.round(duration / 60)} min
-                        </dd>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <dt className="text-sm font-medium text-gray-500">Preço estimado</dt>
-                        <dd className="mt-1 text-2xl font-semibold text-gray-900">
-                          R$ {price.toFixed(2)}
-                        </dd>
-                      </div>
-                    </dl>
+              <div className="mt-6 bg-white shadow-lg rounded-lg p-6">
+                <form onSubmit={handleRequestRide} className="space-y-4">
+                  <div>
+                    <AddressAutocomplete
+                      placeholder="Origem"
+                      onSelect={setOrigin}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
                   </div>
-                )}
 
-                {error && (
-                  <div className="text-red-500 text-sm">
-                    {error}
+                  <div>
+                    <AddressAutocomplete
+                      placeholder="Destino"
+                      onSelect={setDestination}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={loading || !origin || !destination}
-                  className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                >
-                  {loading ? 'Solicitando...' : 'Solicitar Corrida'}
-                </button>
-              </form>
+                  {price && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                      <h3 className="text-lg font-medium text-gray-900">Detalhes da viagem</h3>
+                      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Distância</dt>
+                          <dd className="mt-1 text-sm text-gray-900">
+                            {(distance / 1000).toFixed(1)} km
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Tempo estimado</dt>
+                          <dd className="mt-1 text-sm text-gray-900">
+                            {Math.round(duration / 60)} min
+                          </dd>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <dt className="text-sm font-medium text-gray-500">Preço estimado</dt>
+                          <dd className="mt-1 text-2xl font-semibold text-gray-900">
+                            R$ {price.toFixed(2)}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="text-red-500 text-sm">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || !origin || !destination}
+                    className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                  >
+                    {loading ? 'Solicitando...' : 'Solicitar Corrida'}
+                  </button>
+                </form>
+              </div>
             </div>
-          </LoadScript>
-        </div>
 
-        {currentRide && (
-          <RideStatus 
-            ride={currentRide} 
-            onCancel={handleCancelRide}
-          />
-        )}
-      </div>
+            {currentRide && (
+              <RideStatus 
+                ride={currentRide} 
+                onCancel={handleCancelRide}
+              />
+            )}
+          </div>
+        </div>
+      </LoadScript>
     </div>
   );
 } 
