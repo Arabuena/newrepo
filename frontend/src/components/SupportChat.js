@@ -3,14 +3,13 @@ import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useMessages } from '../contexts/MessageContext';
 
-export default function ChatWithDriver({ ride }) {
+export default function SupportChat() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
-  const receiverId = user.role === 'user' ? ride.driver._id : ride.passenger._id;
   const { notifyNewMessage } = useMessages();
   const previousMessagesRef = useRef([]);
 
@@ -20,14 +19,14 @@ export default function ChatWithDriver({ ride }) {
 
   const loadMessages = async () => {
     try {
-      const response = await api.get(`/messages/ride/${ride._id}`);
+      const response = await api.get('/messages/support');
       setMessages(response.data);
       
-      // Verifica se há mensagens novas apenas se for o destinatário
+      // Verifica se há mensagens novas para o usuário atual
       const newMessages = response.data.filter(msg => 
         !previousMessagesRef.current.find(prevMsg => prevMsg._id === msg._id) &&
-        msg.receiver._id === user.id && // Apenas mensagens onde sou o destinatário
-        msg.sender._id !== user.id && // E não sou o remetente
+        msg.receiver._id === user.id &&
+        msg.sender._id !== user.id &&
         !msg.read
       );
 
@@ -45,12 +44,10 @@ export default function ChatWithDriver({ ride }) {
   };
 
   useEffect(() => {
-    if (ride._id) {
-      loadMessages();
-      const interval = setInterval(loadMessages, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [ride._id]);
+    loadMessages();
+    const interval = setInterval(loadMessages, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -61,16 +58,12 @@ export default function ChatWithDriver({ ride }) {
     if (!newMessage.trim()) return;
 
     try {
-      const response = await api.post('/messages', {
-        rideId: ride._id,
-        receiverId,
+      const response = await api.post('/messages/support', {
         content: newMessage.trim()
       });
 
       setMessages(prevMessages => [...prevMessages, response.data]);
       setNewMessage('');
-      
-      // Atualiza a referência sem notificar, já que sou o remetente
       previousMessagesRef.current = [...messages, response.data];
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err);
@@ -82,7 +75,11 @@ export default function ChatWithDriver({ ride }) {
   if (error) return <div className="text-red-500">{error}</div>;
 
   return (
-    <div className="flex flex-col h-[500px]">
+    <div className="flex flex-col h-[500px] bg-white rounded-lg shadow">
+      <div className="p-4 border-b">
+        <h2 className="text-lg font-semibold">Chat com Suporte</h2>
+      </div>
+      
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div
@@ -98,6 +95,9 @@ export default function ChatWithDriver({ ride }) {
                   : 'bg-gray-200 text-gray-900'
               }`}
             >
+              <p className="text-sm font-medium mb-1">
+                {message.sender.name}
+              </p>
               <p className="text-sm">{message.content}</p>
               <span className="text-xs opacity-75 mt-1 block">
                 {new Date(message.createdAt).toLocaleTimeString()}

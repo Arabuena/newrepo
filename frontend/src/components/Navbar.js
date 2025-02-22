@@ -1,12 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useMessages } from '../contexts/MessageContext';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [showHelp, setShowHelp] = useState(false);
+  const { unreadMessages, markMessagesAsRead } = useMessages();
+
+  // Adiciona log para debug
+  useEffect(() => {
+    console.log('Estado de mensagens não lidas no Navbar:', unreadMessages);
+  }, [unreadMessages]);
 
   // Verifica se está em uma corrida ativa
   const isInRide = location.pathname.includes('/rides/') || 
@@ -16,6 +23,14 @@ export default function Navbar() {
   const handleLogout = () => {
     logout();
     navigate('/');
+  };
+
+  const handleHelpClick = () => {
+    console.log('Menu de ajuda clicado, estado atual:', unreadMessages);
+    setShowHelp(!showHelp);
+    if (unreadMessages) {
+      markMessagesAsRead();
+    }
   };
 
   return (
@@ -57,22 +72,27 @@ export default function Navbar() {
                 {/* Container para o botão e dropdown de ajuda */}
                 <div className="relative">
                   <button
-                    onClick={() => setShowHelp(!showHelp)}
+                    onClick={handleHelpClick}
                     className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center"
                   >
-                    <svg 
-                      className="w-5 h-5 mr-1" 
-                      fill="none" 
-                      viewBox="0 0 24 24" 
-                      stroke="currentColor"
-                    >
-                      <path 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        strokeWidth={2} 
-                        d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
-                      />
-                    </svg>
+                    <div className="relative">
+                      <svg 
+                        className="w-5 h-5 mr-1" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                      >
+                        <path 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round" 
+                          strokeWidth={2} 
+                          d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+                        />
+                      </svg>
+                      {unreadMessages && (
+                        <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
+                      )}
+                    </div>
                     Ajuda
                   </button>
 
@@ -100,6 +120,15 @@ export default function Navbar() {
                     </div>
                   )}
                 </div>
+
+                {user.role === 'admin' && (
+                  <Link 
+                    to="/admin/support" 
+                    className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Central de Suporte
+                  </Link>
+                )}
 
                 <span className="text-gray-300 text-sm">
                   {user.name}
