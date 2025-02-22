@@ -19,7 +19,10 @@ router.patch('/location', auth, async (req, res) => {
   try {
     const { coordinates } = req.body;
     
-    console.log('Recebendo atualização de localização:', coordinates);
+    console.log('Atualizando localização:', {
+      userId: req.user.id,
+      coordinates
+    });
 
     if (!coordinates || !Array.isArray(coordinates) || coordinates.length !== 2) {
       return res.status(400).json({ 
@@ -31,8 +34,10 @@ router.patch('/location', auth, async (req, res) => {
     const user = await User.findByIdAndUpdate(
       req.user.id,
       { 
-        'location.coordinates': coordinates,
-        'location.type': 'Point'
+        location: {
+          type: 'Point',
+          coordinates: coordinates
+        }
       },
       { new: true }
     );
@@ -41,7 +46,15 @@ router.patch('/location', auth, async (req, res) => {
       return res.status(404).json({ message: 'Usuário não encontrado' });
     }
 
-    res.json({ message: 'Localização atualizada com sucesso' });
+    console.log('Localização atualizada:', {
+      userId: user._id,
+      location: user.location
+    });
+
+    res.json({ 
+      message: 'Localização atualizada com sucesso',
+      location: user.location
+    });
   } catch (error) {
     console.error('Erro ao atualizar localização:', error);
     res.status(500).json({ 

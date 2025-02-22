@@ -3,71 +3,42 @@ const User = require('../models/User');
 
 exports.requestRide = async (req, res) => {
   try {
-    const {
-      origin,
-      destination,
-      distance,
-      duration
-    } = req.body;
-
-    // Validações
-    if (distance > 100000) { // 100km em metros
-      return res.status(400).json({ 
-        message: 'Distância muito longa. Máximo permitido: 100km' 
-      });
-    }
-
-    if (duration > 7200) { // 2 horas em segundos
-      return res.status(400).json({ 
-        message: 'Tempo de viagem muito longo. Máximo permitido: 2 horas' 
-      });
-    }
-
-    console.log('=== DEBUG NOVA CORRIDA ===');
-    console.log('Usuário:', req.user);
-    console.log('Dados recebidos:', {
-      origin,
-      destination,
-      distance,
-      duration
-    });
-
-    // Calcula o preço
-    const basePrice = 2;
-    const pricePerKm = 2;
-    const pricePerMin = 0.25;
+    console.log('\n=== DEBUG CRIAÇÃO DE CORRIDA ===');
+    console.log('1. Dados recebidos:', req.body);
     
-    const distancePrice = (distance / 1000) * pricePerKm;
-    const durationPrice = (duration / 60) * pricePerMin;
-    const totalPrice = basePrice + distancePrice + durationPrice;
-
-    // Cria a corrida
     const ride = new Ride({
       passenger: req.user.id,
       origin: {
         type: 'Point',
-        coordinates: [origin.lng, origin.lat],
-        address: origin.address
+        coordinates: [req.body.origin.lng, req.body.origin.lat],
+        address: req.body.origin.address
       },
       destination: {
         type: 'Point',
-        coordinates: [destination.lng, destination.lat],
-        address: destination.address
+        coordinates: [req.body.destination.lng, req.body.destination.lat],
+        address: req.body.destination.address
       },
-      price: Math.round(totalPrice * 100) / 100,
-      distance: Math.round(distance),
-      duration: Math.round(duration),
-      status: 'pending'
+      status: 'pending',
+      distance: req.body.distance,
+      duration: req.body.duration,
+      price: req.body.price
+    });
+
+    console.log('2. Corrida a ser salva:', {
+      passenger: ride.passenger,
+      origin: ride.origin,
+      destination: ride.destination,
+      status: ride.status
     });
 
     await ride.save();
-    console.log('Corrida salva:', ride);
-    console.log('=== FIM DEBUG ===');
+    console.log('3. Corrida salva com sucesso:', ride._id);
+    console.log('=== FIM DEBUG ===\n');
 
     res.status(201).json(ride);
   } catch (error) {
     console.error('Erro ao criar corrida:', error);
-    res.status(500).json({ message: 'Erro ao solicitar corrida' });
+    res.status(500).json({ message: 'Erro ao criar corrida' });
   }
 };
 
@@ -256,34 +227,65 @@ exports.getAvailableRides = async (req, res) => {
       return res.status(403).json({ message: 'Apenas motoristas podem buscar corridas' });
     }
 
-    // Verifica se o motorista está disponível
+    // Busca o motorista com localização atualizada
     const driver = await User.findById(req.user.id);
-    if (!driver.isAvailable) {
-      return res.json([]);
-    }
-
-    console.log('Buscando corridas para motorista:', {
-      driverId: req.user.id,
+    
+    console.log('\n=== DEBUG BUSCA DE CORRIDAS ===');
+    console.log('1. Driver:', {
+      id: driver._id,
       isAvailable: driver.isAvailable,
       location: driver.location
     });
 
-    // Busca corridas pendentes próximas ao motorista
-    const rides = await Ride.find({
+    if (!driver.isAvailable) {
+      console.log('2. Motorista não disponível');
+      return res.json([]);
+    }
+
+    if (!driver.location || !driver.location.coordinates) {
+      console.log('3. Sem localização do motorista');
+      return res.status(400).json({ message: 'Localização do motorista não disponível' });
+    }
+
+    // Primeiro busca todas as corridas pendentes para debug
+    const allPendingRides = await Ride.find({
+      status: 'pending',
+      driver: null
+    });
+
+    console.log('4. Total de corridas pendentes:', allPendingRides.length);
+    
+    if (allPendingRides.length > 0) {
+      console.log('5. Exemplo de corrida pendente:', {
+        id: allPendingRides[0]._id,
+        origin: allPendingRides[0].origin,
+        status: allPendingRides[0].status
+      });
+    }
+
+    // Busca corridas pendentes próximas
+    const query = {
       status: 'pending',
       driver: null,
       'origin.coordinates': {
-        $near: {
-          $geometry: driver.location,
-          $maxDistance: 10000 // 10km
+        $nearSphere: {
+          $geometry: {
+            type: 'Point',
+            coordinates: driver.location.coordinates
+          },
+          $maxDistance: 10000 // 10km em metros
         }
       }
-    })
-    .populate('passenger', 'name phone')
-    .select('-__v')
-    .limit(1);
+    };
 
-    console.log('Corridas encontradas:', rides);
+    console.log('6. Query de busca:', JSON.stringify(query, null, 2));
+
+    const rides = await Ride.find(query)
+      .populate('passenger', 'name phone')
+      .limit(5);
+
+    console.log('7. Corridas encontradas:', rides.length);
+    console.log('=== FIM DEBUG ===\n');
 
     res.json(rides);
   } catch (error) {

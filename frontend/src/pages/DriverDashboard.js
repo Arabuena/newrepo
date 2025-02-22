@@ -163,65 +163,60 @@ export default function DriverDashboard() {
 
   const updateLocation = useCallback(async (position) => {
     try {
-      const { latitude, longitude } = position;
-      console.log('Atualizando localização:', { latitude, longitude });
-
-      const locationData = {
-        coordinates: [longitude, latitude],
-        type: 'Point'
-      };
-
-      console.log('Enviando dados:', locationData);
-      
-      const response = await api.patch('/users/location', locationData);
-      console.log('Localização atualizada:', response.data);
+      const coordinates = [position.coords.longitude, position.coords.latitude];
+      await api.patch('/users/location', { coordinates });
+      setCurrentLocation({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      });
     } catch (error) {
       console.error('Erro ao atualizar localização:', error);
-      setError('Erro ao atualizar localização');
     }
   }, []);
 
-  // Atualiza localização periodicamente
+  // Adicione este useEffect no início do componente
   useEffect(() => {
-    let watchId;
-    let marker = null;
+    const setInitialAvailability = async () => {
+      try {
+        await api.patch('/users/availability', { isAvailable: true });
+        setIsOnline(true);
+        console.log('Motorista marcado como disponível');
+      } catch (error) {
+        console.error('Erro ao definir disponibilidade inicial:', error);
+        setError('Erro ao definir disponibilidade');
+      }
+    };
 
-    if (navigator.geolocation && isOnline) {
-      watchId = navigator.geolocation.watchPosition(
+    setInitialAvailability();
+  }, []);
+
+  // Modifique o useEffect de localização para incluir logs
+  useEffect(() => {
+    if (isOnline) {
+      console.log('Iniciando monitoramento de localização');
+      const watchId = navigator.geolocation.watchPosition(
         (position) => {
-          const location = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setCurrentLocation(location);
-          updateLocation(position.coords);
-
-          if (marker) {
-            marker.setMap(null);
-          }
-          marker = renderMarker(location);
+          const coordinates = [position.coords.longitude, position.coords.latitude];
+          console.log('Nova localização:', coordinates);
+          updateLocation(position);
         },
         (error) => {
-          console.error('Erro ao obter localização:', error);
-          setError('Não foi possível obter sua localização');
+          console.error('Erro de geolocalização:', error);
+          setError('Erro ao obter localização');
         },
-        {
+        { 
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0
         }
       );
-    }
 
-    return () => {
-      if (watchId) {
+      return () => {
+        console.log('Parando monitoramento de localização');
         navigator.geolocation.clearWatch(watchId);
-      }
-      if (marker) {
-        marker.setMap(null);
-      }
-    };
-  }, [isOnline, updateLocation, renderMarker]);
+      };
+    }
+  }, [isOnline, updateLocation]);
 
   // 1. Primeiro definir stopPolling
   const stopPolling = useCallback(() => {

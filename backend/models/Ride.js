@@ -14,10 +14,10 @@ const rideSchema = new mongoose.Schema({
     type: {
       type: String,
       enum: ['Point'],
-      default: 'Point'
+      required: true
     },
     coordinates: {
-      type: [Number],
+      type: [Number], // [longitude, latitude]
       required: true
     },
     address: String
@@ -26,10 +26,10 @@ const rideSchema = new mongoose.Schema({
     type: {
       type: String,
       enum: ['Point'],
-      default: 'Point'
+      required: true
     },
     coordinates: {
-      type: [Number],
+      type: [Number], // [longitude, latitude]
       required: true
     },
     address: String
@@ -48,9 +48,16 @@ const rideSchema = new mongoose.Schema({
   }
 });
 
-// Adiciona índices geoespaciais
+// Garante que os índices são criados
 rideSchema.index({ 'origin.coordinates': '2dsphere' });
 rideSchema.index({ 'destination.coordinates': '2dsphere' });
+
+// Middleware para garantir que o tipo Point seja definido
+rideSchema.pre('save', function(next) {
+  if (!this.origin.type) this.origin.type = 'Point';
+  if (!this.destination.type) this.destination.type = 'Point';
+  next();
+});
 
 // Exporta o modelo apenas se ainda não existir
 module.exports = mongoose.models.Ride || mongoose.model('Ride', rideSchema); 
