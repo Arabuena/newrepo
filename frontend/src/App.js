@@ -11,6 +11,7 @@ import DriverDashboard from './pages/DriverDashboard';
 import PrivateRoute from './components/PrivateRoute';
 import AdminDashboard from './pages/AdminDashboard';
 import RideDetails from './pages/RideDetails';
+import HelpPage from './pages/HelpPage';
 
 function App() {
   return (
@@ -52,6 +53,14 @@ function App() {
               element={
                 <PrivateRoute roles={['passenger', 'driver']}>
                   <RideDetails />
+                </PrivateRoute>
+              } 
+            />
+            <Route 
+              path="/help/:type" 
+              element={
+                <PrivateRoute>
+                  <HelpPage />
                 </PrivateRoute>
               } 
             />

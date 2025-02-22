@@ -296,11 +296,16 @@ exports.getCurrentRide = async (req, res) => {
   try {
     const ride = await Ride.findOne({
       $or: [
-        { driver: req.user.id, status: { $in: ['accepted', 'in_progress'] } },
-        { passenger: req.user.id, status: { $in: ['accepted', 'in_progress'] } }
-      ]
-    }).populate('passenger', 'name phone')
-      .populate('driver', 'name phone vehicle');
+        { passenger: req.user.id },
+        { driver: req.user.id }
+      ],
+      status: { 
+        $in: ['pending', 'accepted', 'in_progress'] 
+      }
+    })
+    .populate('passenger', 'name phone')
+    .populate('driver', 'name phone vehicle')
+    .sort('-createdAt'); // Pega a mais recente
 
     if (!ride) {
       return res.json(null);

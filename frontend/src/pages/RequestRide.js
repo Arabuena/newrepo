@@ -78,6 +78,46 @@ export default function RequestRide() {
     };
   }, [renderMarker]);
 
+  // Busca a corrida ativa ao carregar a página
+  useEffect(() => {
+    const fetchCurrentRide = async () => {
+      try {
+        const response = await api.get('/rides/current');
+        if (response.data) {
+          setCurrentRide(response.data);
+          
+          // Se tiver uma corrida ativa, busca as direções
+          if (response.data.status !== 'completed' && response.data.status !== 'cancelled') {
+            const directionsService = new window.google.maps.DirectionsService();
+            
+            const origin = {
+              lat: response.data.origin.coordinates[1],
+              lng: response.data.origin.coordinates[0]
+            };
+            
+            const destination = {
+              lat: response.data.destination.coordinates[1],
+              lng: response.data.destination.coordinates[0]
+            };
+
+            const result = await directionsService.route({
+              origin,
+              destination,
+              travelMode: window.google.maps.TravelMode.DRIVING
+            });
+
+            setDirections(result);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar corrida atual:', error);
+        setError('Erro ao buscar corrida atual');
+      }
+    };
+
+    fetchCurrentRide();
+  }, []);
+
   // Atualiza rota quando origem ou destino mudam
   useEffect(() => {
     if (origin && destination && window.google) {
@@ -170,93 +210,92 @@ export default function RequestRide() {
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      <LoadScript 
-        googleMapsApiKey={GOOGLE_MAPS_API_KEY}
-        libraries={GOOGLE_MAPS_LIBRARIES}
-      >
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              Solicitar Corrida
-            </h1>
+    <div className="h-full">
+      <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
+        <div className="h-full relative">
+          <GoogleMap
+            mapContainerStyle={mapContainerStyle}
+            center={currentLocation || { lat: -16.6799, lng: -49.2556 }}
+            zoom={13}
+            onLoad={onMapLoad}
+          >
+            {/* Renderiza as direções se existirem */}
+            {directions && <DirectionsRenderer directions={directions} />}
+          </GoogleMap>
 
-            <div className="mt-6">
-              <GoogleMap
-                mapContainerStyle={mapContainerStyle}
-                zoom={14}
-                center={currentLocation || { lat: -23.550520, lng: -46.633308 }}
-                onLoad={onMapLoad}
-              >
-                {directions && <DirectionsRenderer directions={directions} />}
-              </GoogleMap>
-
-              <div className="mt-6 bg-white shadow-lg rounded-lg p-6">
-                <form onSubmit={handleRequestRide} className="space-y-4">
-                  <div>
-                    <AddressAutocomplete
-                      placeholder="Origem"
-                      onSelect={setOrigin}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <AddressAutocomplete
-                      placeholder="Destino"
-                      onSelect={setDestination}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  {price && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                      <h3 className="text-lg font-medium text-gray-900">Detalhes da viagem</h3>
-                      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">Distância</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {(distance / 1000).toFixed(1)} km
-                          </dd>
-                        </div>
-                        <div>
-                          <dt className="text-sm font-medium text-gray-500">Tempo estimado</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {Math.round(duration / 60)} min
-                          </dd>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <dt className="text-sm font-medium text-gray-500">Preço estimado</dt>
-                          <dd className="mt-1 text-2xl font-semibold text-gray-900">
-                            R$ {price.toFixed(2)}
-                          </dd>
-                        </div>
-                      </dl>
-                    </div>
-                  )}
-
-                  {error && (
-                    <div className="text-red-500 text-sm">
-                      {error}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={loading || !origin || !destination}
-                    className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                  >
-                    {loading ? 'Solicitando...' : 'Solicitar Corrida'}
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            {currentRide && (
+          {/* Formulário e outros componentes */}
+          <div className="absolute top-4 left-4 right-4 max-w-md mx-auto">
+            {currentRide ? (
               <RideStatus 
                 ride={currentRide} 
                 onCancel={handleCancelRide}
               />
+            ) : (
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h1 className="text-2xl font-semibold text-gray-900">
+                  Solicitar Corrida
+                </h1>
+
+                <div className="mt-6">
+                  <form onSubmit={handleRequestRide} className="space-y-4">
+                    <div>
+                      <AddressAutocomplete
+                        placeholder="Origem"
+                        onSelect={setOrigin}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <AddressAutocomplete
+                        placeholder="Destino"
+                        onSelect={setDestination}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    {price && (
+                      <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                        <h3 className="text-lg font-medium text-gray-900">Detalhes da viagem</h3>
+                        <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                          <div>
+                            <dt className="text-sm font-medium text-gray-500">Distância</dt>
+                            <dd className="mt-1 text-sm text-gray-900">
+                              {(distance / 1000).toFixed(1)} km
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-sm font-medium text-gray-500">Tempo estimado</dt>
+                            <dd className="mt-1 text-sm text-gray-900">
+                              {Math.round(duration / 60)} min
+                            </dd>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <dt className="text-sm font-medium text-gray-500">Preço estimado</dt>
+                            <dd className="mt-1 text-2xl font-semibold text-gray-900">
+                              R$ {price.toFixed(2)}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="text-red-500 text-sm">
+                        {error}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={loading || !origin || !destination}
+                      className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    >
+                      {loading ? 'Solicitando...' : 'Solicitar Corrida'}
+                    </button>
+                  </form>
+                </div>
+              </div>
             )}
           </div>
         </div>
