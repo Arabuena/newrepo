@@ -2,10 +2,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import { LoadScript, GoogleMap, DirectionsRenderer, Marker } from '@react-google-maps/api';
 
+// Constantes que podem ficar fora do componente
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_LIBRARIES = ['places'];
+const CONNECTION_CHECK_INTERVAL = 10000;
+const MAX_RETRIES = 3;
+const mapContainerStyle = {
+  width: '100%',
+  height: '100%'
+};
 
-// Adiciona função de debounce
+// Função de utilidade que pode ficar fora
 const debounce = (func, wait) => {
   let timeout;
   return function executedFunction(...args) {
@@ -18,81 +25,29 @@ const debounce = (func, wait) => {
   };
 };
 
-// Adicione estas constantes no topo do arquivo
-const CONNECTION_CHECK_INTERVAL = 10000; // 10 segundos
-const MAX_RETRIES = 3;
-const LOCATION_UPDATE_INTERVAL = 10000; // 10 segundos
-
-const mapContainerStyle = {
-  width: '100%',
-  height: '100%'
-};
-
 export default function DriverDashboard() {
+  // Estados
   const [isOnline, setIsOnline] = useState(false);
   const [currentRide, setCurrentRide] = useState(null);
   const [availableRide, setAvailableRide] = useState(null);
   const [error, setError] = useState('');
   const [currentLocation, setCurrentLocation] = useState(null);
   const [directions, setDirections] = useState(null);
-  const mapRef = useRef(null);
   const [directionsRenderer, setDirectionsRenderer] = useState(null);
-  const pollingIntervalRef = useRef(null);
-  const SHOW_TIME = 15000;
-  const HIDE_TIME = 10000;
-  const DECLINE_TIMEOUT = 45000;
-  const [declinedRideId, setDeclinedRideId] = useState(null);
-  const showTimerRef = useRef(null);
-  const hideTimerRef = useRef(null);
-  const POLLING_INTERVAL = 15000;
-  const audioRef = useRef(null);
   const [rideStatus, setRideStatus] = useState(null);
   const [isConnected, setIsConnected] = useState(true);
+  const [declinedRideId, setDeclinedRideId] = useState(null);
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
-  const debouncedFetch = useRef(
-    debounce(async () => {
-      if (!isOnline || currentRide) {
-        console.log('Ignorando busca de corridas:', { isOnline, hasCurrent: !!currentRide });
-        return;
-      }
+  // Refs
+  const mapRef = useRef(null);
+  const pollingIntervalRef = useRef(null);
+  const showTimerRef = useRef(null);
+  const hideTimerRef = useRef(null);
+  const audioRef = useRef(null);
+  const DECLINE_TIMEOUT = 45000;
 
-      try {
-        console.log('Buscando corridas disponíveis...');
-        const response = await api.get('/rides/available');
-        console.log('Resposta da busca:', response.data);
-        
-        if (response.data.length > 0) {
-          const ride = response.data[0];
-          console.log('Nova corrida encontrada:', ride);
-          
-          if (ride._id !== declinedRideId) {
-            setAvailableRide(ride);
-            playNotification();
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao buscar corridas:', error);
-      }
-    }, 1000)
-  ).current;
-
-  // Inicializa o áudio de forma simples e direta
-  useEffect(() => {
-    const audio = new Audio('/sounds/notification.mp3');
-    audio.preload = 'auto';
-    audio.volume = 1.0;
-    audioRef.current = audio;
-
-    // Cleanup quando o componente é desmontado
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
-  // Função simples para tocar o som
+  // 1. Primeiro definir playNotification
   const playNotification = useCallback(() => {
     if (!audioRef.current || !isOnline) return;
 
@@ -106,34 +61,116 @@ export default function DriverDashboard() {
     }
   }, [isOnline]);
 
-  // Função para atualizar a rota no mapa
-  const updateMapRoute = useCallback(async (ride, isDestination = false) => {
-    if (!window.google || !directionsRenderer) return;
-
+  // 2. Depois definir fetchAvailableRide que usa playNotification
+  const fetchAvailableRide = useCallback(async () => {
+    if (!isOnline || currentRide) return;
     try {
-      const directionsService = new window.google.maps.DirectionsService();
-      
-      const origin = isDestination ? ride.origin : currentLocation;
-      const destination = isDestination ? ride.destination : ride.origin;
-      
-      const result = await directionsService.route({
-        origin,
-        destination,
-        travelMode: window.google.maps.TravelMode.DRIVING,
-      });
-      
-      directionsRenderer.setDirections(result);
-      setDirections(result);
+      const response = await api.get('/rides/available');
+      if (response.data.length > 0) {
+        const ride = response.data[0];
+        if (ride._id !== declinedRideId) {
+          setAvailableRide(ride);
+          playNotification();
+        }
+      }
     } catch (error) {
-      console.error('Erro ao atualizar rota:', error);
+      console.error('Erro ao buscar corridas:', error);
     }
-  }, [currentLocation, directionsRenderer]);
+  }, [isOnline, currentRide, declinedRideId, playNotification]);
 
-  // 2. Depois definir clearMapRoute
+  // 3. Depois definir debouncedFetch que usa fetchAvailableRide
+  const debouncedFetch = useCallback(
+    () => debounce(() => fetchAvailableRide(), 1000),
+    [fetchAvailableRide]
+  );
+
+  // Inicializa o áudio
+  useEffect(() => {
+    const audio = new Audio('/sounds/notification.mp3');
+    audio.preload = 'auto';
+    audio.volume = 1.0;
+    audioRef.current = audio;
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   const clearMapRoute = useCallback(() => {
     if (directionsRenderer) {
       directionsRenderer.setMap(null);
       setDirectionsRenderer(null);
+    }
+  }, [directionsRenderer]);
+
+  // Função para processar dados da corrida
+  const processRideData = useCallback((ride) => {
+    if (!currentLocation) {
+      console.error('Localização atual não disponível');
+      return null;
+    }
+
+    // Converte a localização atual para LatLng
+    const origin = new window.google.maps.LatLng(
+      currentLocation.lat,
+      currentLocation.lng
+    );
+
+    // Define o destino baseado no status da corrida
+    const destinationCoords = ride.status === 'accepted' 
+      ? ride.origin.coordinates  // Se aceita, vai até o passageiro
+      : ride.destination.coordinates; // Se em progresso, vai até o destino final
+
+    const destination = new window.google.maps.LatLng(
+      destinationCoords[1],  // latitude
+      destinationCoords[0]   // longitude
+    );
+
+    return {
+      origin,
+      destination,
+      travelMode: window.google.maps.TravelMode.DRIVING
+    };
+  }, [currentLocation]);
+
+  // Função para atualizar a rota no mapa
+  const updateMapRoute = useCallback(async (routeData) => {
+    if (!mapRef.current || !window.google) return;
+
+    try {
+      // Limpa rota anterior se existir
+      if (directionsRenderer) {
+        directionsRenderer.setMap(null);
+      }
+
+      // Cria novo DirectionsService e DirectionsRenderer
+      const directionsService = new window.google.maps.DirectionsService();
+      const newDirectionsRenderer = new window.google.maps.DirectionsRenderer({
+        map: mapRef.current,
+        suppressMarkers: false,
+        preserveViewport: false
+      });
+
+      // Solicita a rota
+      const result = await directionsService.route(routeData);
+      
+      // Atualiza a rota no mapa
+      newDirectionsRenderer.setDirections(result);
+      setDirectionsRenderer(newDirectionsRenderer);
+      setDirections(result);
+
+      // Ajusta o zoom para mostrar toda a rota
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(routeData.origin);
+      bounds.extend(routeData.destination);
+      mapRef.current.fitBounds(bounds);
+
+    } catch (error) {
+      console.error('Erro ao atualizar rota:', error);
+      setError('Erro ao atualizar rota no mapa');
     }
   }, [directionsRenderer]);
 
@@ -221,129 +258,83 @@ export default function DriverDashboard() {
   // 1. Primeiro definir stopPolling
   const stopPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
-      console.log('Parando polling...');
+      console.log('Parando polling');
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
+      setAvailableRide(null); // Limpa qualquer corrida disponível ao parar
     }
   }, []);
 
   // 2. Depois definir startPolling que usa stopPolling
   const startPolling = useCallback(() => {
     if (pollingIntervalRef.current) {
-      console.log('Polling já está ativo');
-      return;
+      clearInterval(pollingIntervalRef.current);
     }
 
-    console.log('Iniciando novo polling...');
+    console.log('Iniciando polling de corridas...');
     pollingIntervalRef.current = setInterval(async () => {
       try {
+        // Só faz polling se estiver online e sem corrida atual
         if (!isOnline || currentRide) {
-          console.log('Condições não permitem polling:', { isOnline, hasCurrent: !!currentRide });
+          console.log('Parando polling:', { isOnline, hasCurrent: !!currentRide });
           stopPolling();
           return;
         }
 
         const response = await api.get('/rides/available');
-        console.log('Resposta do polling:', response.data);
-        
         if (response.data.length > 0) {
           const ride = response.data[0];
           if (ride._id !== declinedRideId) {
             setAvailableRide(ride);
-            if (document.documentElement.hasAttribute('data-user-interacted')) {
-              playNotification();
-            }
+            playNotification();
           }
+        } else {
+          setAvailableRide(null);
         }
       } catch (error) {
         console.error('Erro no polling:', error);
       }
     }, 5000);
-    
-    console.log('Polling iniciado com sucesso');
   }, [isOnline, currentRide, declinedRideId, playNotification, stopPolling]);
 
-  // 3. Depois os useEffects que usam essas funções
+  // 3. Depois o useEffect que usa ambas as funções
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchCurrentRide = async () => {
-      if (!isOnline || !isMounted) return;
-
+    const loadCurrentRide = async () => {
       try {
-        console.log('Buscando corrida atual...');
         const response = await api.get('/rides/current');
-        
-        if (!isMounted) return;
+        if (response.data) {
+          const currentRide = response.data;
+          setCurrentRide(currentRide);
+          setRideStatus(currentRide.status);
+          stopPolling(); // Para o polling se tiver corrida atual
 
-        // Se não há corrida atual
-        if (!response.data) {
-          // Limpa os estados apenas se havia uma corrida anteriormente
-          if (currentRide) {
-            console.log('Limpando estados da corrida anterior');
-            setCurrentRide(null);
-            setRideStatus(null);
-            setDirections(null);
-            setAvailableRide(null);
-            
-            if (directionsRenderer) {
-              directionsRenderer.setMap(null);
-              setDirectionsRenderer(null);
-            }
+          const rideData = processRideData(currentRide);
+          if (rideData) {
+            await updateMapRoute(rideData);
           }
-          
-          // Inicia polling apenas se estiver online e não houver corrida
+        } else {
+          // Se não tem corrida atual e está online, inicia o polling
           if (isOnline) {
             startPolling();
           }
-          return;
-        }
-
-        // Se há uma corrida atual
-        const ride = response.data;
-        
-        // Não atualiza se a corrida já foi finalizada
-        if (ride.status === 'completed') {
-          console.log('Ignorando corrida finalizada:', ride._id);
-          // Limpa todos os estados
-          setCurrentRide(null);
-          setRideStatus(null);
-          setDirections(null);
-          setAvailableRide(null);
-          
-          if (directionsRenderer) {
-            directionsRenderer.setMap(null);
-            setDirectionsRenderer(null);
-          }
-          
-          // Reinicia o polling
-          if (isOnline) {
-            startPolling();
-          }
-          return;
-        }
-
-        // Atualiza apenas se necessário
-        if (!currentRide || currentRide._id !== ride._id || currentRide.status !== ride.status) {
-          console.log('Atualizando corrida atual:', ride);
-          setCurrentRide(ride);
-          setRideStatus(ride.status);
-          updateMapRoute(ride, ride.status === 'in_progress');
-          stopPolling();
         }
       } catch (error) {
-        console.error('Erro ao buscar corrida atual:', error);
+        console.error('Erro ao carregar corrida atual:', error);
+        setError('Erro ao carregar corrida atual');
       }
     };
 
-    // Executa a busca imediatamente
-    fetchCurrentRide();
+    if (isOnline) {
+      loadCurrentRide();
+    } else {
+      stopPolling(); // Para o polling se ficar offline
+    }
 
-    // Cleanup
+    // Cleanup quando o componente desmontar
     return () => {
-      isMounted = false;
+      stopPolling();
     };
-  }, [isOnline, currentRide, directionsRenderer, updateMapRoute, startPolling, stopPolling]);
+  }, [isOnline, processRideData, updateMapRoute, startPolling, stopPolling]);
 
   // Adicionar detector de interação do usuário
   useEffect(() => {
@@ -465,46 +456,46 @@ export default function DriverDashboard() {
     };
   }, []);
 
-  // Função para aceitar corrida
+  // Atualizar a função handleAcceptRide
   const handleAcceptRide = async () => {
-    if (!availableRide) return;
-
     try {
-      console.log('Aceitando corrida:', availableRide._id);
       const response = await api.post(`/rides/accept/${availableRide._id}`);
-      console.log('Resposta ao aceitar:', response.data);
+      
+      // Processa os dados da corrida antes de atualizar a rota
+      const rideData = processRideData(availableRide);
+      if (!rideData) return;
+
+      // Atualiza a rota com os dados processados (false = rota até o passageiro)
+      await updateMapRoute(rideData);
       
       setCurrentRide(response.data);
       setRideStatus('accepted');
       setAvailableRide(null);
       stopPolling();
-      
-      // Atualiza o mapa com a rota até o passageiro
-      updateMapRoute(response.data);
+
     } catch (error) {
       console.error('Erro ao aceitar corrida:', error);
-      setError(error?.response?.data?.message || 'Erro ao aceitar corrida');
+      setError('Erro ao aceitar corrida');
     }
   };
 
-  // Função para iniciar corrida
+  // Atualizar a função handleStartRide
   const handleStartRide = async () => {
-    if (!currentRide) return;
-
     try {
-      console.log('Iniciando corrida:', currentRide._id);
-      setError('');
       const response = await api.post(`/rides/start/${currentRide._id}`);
-      console.log('Resposta ao iniciar:', response.data);
+      
+      // Processa os dados novamente para a rota até o destino
+      const rideData = processRideData(currentRide);
+      if (!rideData) return;
+
+      // Atualiza a rota para o destino (true = rota até o destino)
+      await updateMapRoute(rideData);
       
       setCurrentRide(response.data);
       setRideStatus('in_progress');
-      
-      // Atualiza o mapa com a rota até o destino
-      updateMapRoute(response.data, true);
     } catch (error) {
       console.error('Erro ao iniciar corrida:', error);
-      setError(error?.response?.data?.message || 'Erro ao iniciar corrida');
+      setError('Erro ao iniciar corrida');
     }
   };
 
@@ -564,84 +555,111 @@ export default function DriverDashboard() {
     }, DECLINE_TIMEOUT);
   };
 
-  // Adicione este componente para mostrar os detalhes da corrida atual
+  // Atualizar o componente CurrentRideDetailsComponent
   const CurrentRideDetailsComponent = ({ ride, status, onComplete, onStart }) => {
-    if (!ride) return null;
-
     return (
-      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg rounded-t-3xl p-6 animate-slide-up z-30">
-        <div className="max-w-xl mx-auto">
-          <h3 className="text-lg font-semibold mb-4">
-            {status === 'accepted' ? 'A caminho do passageiro' : 'Corrida em andamento'}
-          </h3>
-          
-          <div className="space-y-4">
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-sm text-gray-600">
-                <span className="font-medium">Passageiro:</span> {ride.passenger.name}
-              </p>
-              <p className="text-sm text-gray-600 mt-2">
-                <span className="font-medium">Telefone:</span> {ride.passenger.phone}
-              </p>
-            </div>
+      <div className="fixed bottom-0 left-0 right-0 z-50">
+        {/* Painel de detalhes expansível - Movido para antes do botão principal */}
+        <div className={`bg-white shadow-lg transition-transform duration-300 ease-in-out transform ${
+          isDetailsExpanded ? 'translate-y-0' : 'translate-y-full'
+        }`}>
+          {isDetailsExpanded && (
+            <div className="p-6">
+              <div className="max-w-xl mx-auto">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {status === 'accepted' ? 'Indo buscar passageiro' : 'Em viagem'}
+                  </h3>
+                  <div className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    {status === 'accepted' ? 'A caminho' : 'Em andamento'}
+                  </div>
+                </div>
 
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <p className="text-sm text-gray-600">
-                <span className="font-medium">Local de Embarque:</span> {ride.origin.address}
-              </p>
-              <p className="text-sm text-gray-600 mt-2">
-                <span className="font-medium">Destino:</span> {ride.destination.address}
-              </p>
-            </div>
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="mb-3">
+                      <p className="text-sm text-gray-500">Passageiro</p>
+                      <p className="text-gray-900 font-medium">{ride.passenger.name}</p>
+                    </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm font-medium text-gray-500">Distância</p>
-                <p className="text-sm text-gray-900">{(ride.distance / 1000).toFixed(1)} km</p>
+                    <div>
+                      <p className="text-sm text-gray-500">
+                        {status === 'accepted' ? 'Local de embarque' : 'Destino'}
+                      </p>
+                      <p className="text-gray-900">
+                        {status === 'accepted' ? ride.origin.address : ride.destination.address}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500">Distância</p>
+                      <p className="text-gray-900 font-medium">
+                        {(ride.distance / 1000).toFixed(1)} km
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500">Tempo est.</p>
+                      <p className="text-gray-900 font-medium">
+                        {Math.round(ride.duration / 60)} min
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-sm text-gray-500">Valor</p>
+                      <p className="text-green-600 font-semibold">
+                        R$ {ride.price.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm font-medium text-gray-500">Tempo est.</p>
-                <p className="text-sm text-gray-900">{Math.round(ride.duration / 60)} min</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm font-medium text-gray-500">Valor</p>
-                <p className="text-lg font-semibold text-green-600">
-                  R$ {ride.price.toFixed(2)}
-                </p>
-              </div>
             </div>
+          )}
+        </div>
 
-            <div className="flex space-x-3">
-              <a
-                href={`tel:${ride.passenger.phone}`}
-                className="flex-1 bg-green-500 text-white py-4 px-4 rounded-lg font-medium hover:bg-green-600 transition-colors text-center"
-              >
-                Ligar para Passageiro
-              </a>
-              
-              {status === 'accepted' && (
-                <button
-                  onClick={onStart}
-                  className="flex-1 bg-blue-500 text-white py-4 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors"
-                >
-                  Iniciar Corrida
-                </button>
-              )}
+        {/* Botão para expandir/colapsar */}
+        <button
+          onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+          className="absolute -top-8 right-4 bg-white rounded-t-lg px-4 py-1 text-sm text-gray-600 shadow-lg"
+        >
+          {isDetailsExpanded ? '▼ Minimizar' : '▲ Detalhes'}
+        </button>
 
-              {status === 'in_progress' && (
-                <button
-                  onClick={onComplete}
-                  className="flex-1 bg-blue-500 text-white py-4 px-4 rounded-lg font-medium hover:bg-blue-600 transition-colors"
-                >
-                  Finalizar Corrida
-                </button>
-              )}
-            </div>
-          </div>
+        {/* Botão principal sempre visível */}
+        <div className="bg-white shadow-lg p-4 flex justify-center">
+          {status === 'accepted' ? (
+            <button
+              onClick={onStart}
+              className="w-full max-w-md bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors"
+            >
+              Iniciar Corrida
+            </button>
+          ) : (
+            <button
+              onClick={onComplete}
+              className="w-full max-w-md bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors"
+            >
+              Finalizar Corrida
+            </button>
+          )}
         </div>
       </div>
     );
   };
+
+  // Usar as funções em algum lugar do código
+  useEffect(() => {
+    if (isOnline && !currentRide) {
+      debouncedFetch();
+    }
+  }, [isOnline, currentRide, debouncedFetch]);
+
+  useEffect(() => {
+    return () => {
+      clearMapRoute();
+    };
+  }, [clearMapRoute]);
 
   return (
     <div className="h-screen flex flex-col">
