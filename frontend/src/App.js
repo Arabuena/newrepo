@@ -15,6 +15,7 @@ import RideDetails from './pages/RideDetails';
 import HelpPage from './pages/HelpPage';
 import MessagePoller from './components/MessagePoller';
 import AdminSupportPage from './pages/AdminSupportPage';
+import RideChat from './components/RideChat';
 
 function App() {
   return (
@@ -74,6 +75,14 @@ function App() {
                 element={
                   <PrivateRoute roles={['admin']}>
                     <AdminSupportPage />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/help/chat" 
+                element={
+                  <PrivateRoute roles={['driver', 'user']}>
+                    <RideChat />
                   </PrivateRoute>
                 } 
               />

@@ -557,6 +557,36 @@ export default function DriverDashboard() {
 
   // Atualizar o componente CurrentRideDetailsComponent
   const CurrentRideDetailsComponent = ({ ride, status, onComplete, onStart }) => {
+    const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+
+    const openGpsNavigation = () => {
+      // Coordenadas do destino baseadas no status da corrida
+      const destination = status === 'accepted' 
+        ? ride.origin.coordinates  // Se acabou de aceitar, navega até o passageiro
+        : ride.destination.coordinates; // Se já pegou o passageiro, navega até o destino final
+      
+      // Inverte as coordenadas pois o MongoDB armazena como [lng, lat] e as APIs de navegação usam [lat, lng]
+      const [lng, lat] = destination;
+      
+      // Cria URLs para diferentes apps de navegação
+      const navigationApps = {
+        'Google Maps': `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
+        'Waze': `https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`,
+        // Outros apps podem ser adicionados aqui
+      };
+
+      // Cria o menu de seleção
+      const app = window.confirm(
+        'Escolha o app de navegação:\n\n' +
+        'OK - Google Maps\n' +
+        'Cancelar - Waze'
+      );
+
+      // Abre o app escolhido
+      const url = app ? navigationApps['Google Maps'] : navigationApps['Waze'];
+      window.open(url, '_blank');
+    };
+
     return (
       <div className="fixed bottom-0 left-0 right-0 z-50">
         {/* Painel de detalhes expansível - Movido para antes do botão principal */}
@@ -626,23 +656,23 @@ export default function DriverDashboard() {
           {isDetailsExpanded ? '▼ Minimizar' : '▲ Detalhes'}
         </button>
 
-        {/* Botão principal sempre visível */}
-        <div className="bg-white shadow-lg p-4 flex justify-center">
-          {status === 'accepted' ? (
-            <button
-              onClick={onStart}
-              className="w-full max-w-md bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors"
-            >
-              Iniciar Corrida
-            </button>
-          ) : (
-            <button
-              onClick={onComplete}
-              className="w-full max-w-md bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors"
-            >
-              Finalizar Corrida
-            </button>
-          )}
+        {/* Botões principais */}
+        <div className="bg-white shadow-lg p-4 flex justify-center space-x-4">
+          {/* Botão de navegação GPS */}
+          <button
+            onClick={openGpsNavigation}
+            className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+          >
+            Abrir GPS
+          </button>
+
+          {/* Botão de iniciar/finalizar */}
+          <button
+            onClick={status === 'accepted' ? onStart : onComplete}
+            className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 transition-colors"
+          >
+            {status === 'accepted' ? 'Iniciar Corrida' : 'Finalizar Corrida'}
+          </button>
         </div>
       </div>
     );

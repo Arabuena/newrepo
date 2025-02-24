@@ -4,6 +4,7 @@ import AddressAutocomplete from '../components/AddressAutocomplete';
 import api from '../services/api';
 import RideStatus from '../components/RideStatus';
 import { useNavigate } from 'react-router-dom';
+import RideChat from '../components/RideChat';
 
 const GOOGLE_MAPS_API_KEY = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
 const GOOGLE_MAPS_LIBRARIES = ['places'];
@@ -24,6 +25,7 @@ export default function RequestRide() {
   const [distance, setDistance] = useState(null);
   const [duration, setDuration] = useState(null);
   const [currentRide, setCurrentRide] = useState(null);
+  const [showChat, setShowChat] = useState(false);
   const navigate = useNavigate();
   const mapRef = useRef(null);
 
@@ -210,28 +212,65 @@ export default function RequestRide() {
   };
 
   return (
-    <div className="h-full">
+    <div className="h-full relative">
       <LoadScript googleMapsApiKey={GOOGLE_MAPS_API_KEY} libraries={GOOGLE_MAPS_LIBRARIES}>
-        <div className="h-full relative">
-          <GoogleMap
-            mapContainerStyle={mapContainerStyle}
-            center={currentLocation || { lat: -16.6799, lng: -49.2556 }}
-            zoom={13}
-            onLoad={onMapLoad}
-          >
-            {/* Renderiza as direções se existirem */}
-            {directions && <DirectionsRenderer directions={directions} />}
-          </GoogleMap>
+        <div className="h-full flex">
+          {/* Mapa */}
+          <div className={`flex-1 relative ${showChat ? 'hidden md:block' : ''}`}>
+            <GoogleMap
+              mapContainerStyle={mapContainerStyle}
+              center={currentLocation || { lat: -16.6799, lng: -49.2556 }}
+              zoom={13}
+              onLoad={onMapLoad}
+            >
+              {/* Renderiza as direções se existirem */}
+              {directions && <DirectionsRenderer directions={directions} />}
+            </GoogleMap>
+          </div>
 
-          {/* Formulário e outros componentes */}
-          <div className="absolute top-4 left-4 right-4 max-w-md mx-auto">
+          {/* Painel lateral */}
+          <div className={`w-full md:w-[400px] bg-white shadow-lg relative ${showChat ? 'h-full' : ''}`}>
             {currentRide ? (
-              <RideStatus 
-                ride={currentRide} 
-                onCancel={handleCancelRide}
-              />
+              <>
+                {showChat ? (
+                  // Chat da corrida
+                  <div className="h-full">
+                    <div className="p-4 border-b flex items-center justify-between">
+                      <button
+                        onClick={() => setShowChat(false)}
+                        className="text-gray-600 hover:text-gray-800"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <span className="font-semibold">Chat da Corrida</span>
+                      <div className="w-6" /> {/* Espaçador */}
+                    </div>
+                    <RideChat />
+                  </div>
+                ) : (
+                  // Status da corrida
+                  <div className="p-4">
+                    <RideStatus 
+                      ride={currentRide} 
+                      onCancel={handleCancelRide} 
+                    />
+                    <button
+                      onClick={() => setShowChat(true)}
+                      className="mt-4 w-full bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      Conversar com Motorista
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              // Formulário de solicitação de corrida
+              <div className="p-4">
                 <h1 className="text-2xl font-semibold text-gray-900">
                   Solicitar Corrida
                 </h1>
