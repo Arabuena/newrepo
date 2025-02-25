@@ -1,32 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { useMessages } from '../contexts/MessageContext';
 
 export default function AdminSupportChat() {
   const [conversations, setConversations] = useState([]);
-  const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showUserSelect, setShowUserSelect] = useState(false);
   const { user } = useAuth();
   const messagesEndRef = useRef(null);
 
-  // Carregar lista de usuários
-  const loadUsers = async () => {
-    try {
-      const response = await api.get('/users');
-      // Filtra admin da lista
-      const filteredUsers = response.data.filter(u => u.role !== 'admin');
-      setUsers(filteredUsers);
-    } catch (err) {
-      console.error('Erro ao carregar usuários:', err);
-    }
-  };
-
+  // Carregar conversas de suporte
   const loadConversations = async () => {
     try {
       const response = await api.get('/messages/support/conversations');
@@ -39,12 +25,12 @@ export default function AdminSupportChat() {
     }
   };
 
+  // Carregar mensagens de um usuário específico
   const loadMessages = async (userId) => {
     try {
       const response = await api.get(`/messages/support/user/${userId}`);
       setMessages(response.data);
       setSelectedUser(userId);
-      setShowUserSelect(false);
     } catch (err) {
       console.error('Erro ao carregar mensagens:', err);
       setError('Erro ao carregar mensagens');
@@ -53,7 +39,6 @@ export default function AdminSupportChat() {
 
   useEffect(() => {
     loadConversations();
-    loadUsers();
     const interval = setInterval(loadConversations, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -65,11 +50,6 @@ export default function AdminSupportChat() {
       return () => clearInterval(interval);
     }
   }, [selectedUser]);
-
-  useEffect(() => {
-    // Rola para a última mensagem quando novas mensagens chegarem
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -83,75 +63,81 @@ export default function AdminSupportChat() {
 
       setMessages(prev => [...prev, response.data]);
       setNewMessage('');
-      loadConversations(); // Atualiza a lista de conversas
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err);
       setError('Erro ao enviar mensagem');
     }
   };
 
-  const handleNewChat = () => {
-    setShowUserSelect(true);
-    setSelectedUser(null);
-    setMessages([]);
+  // Função para formatar a data
+  const formatLastMessageTime = (date) => {
+    const messageDate = new Date(date);
+    const now = new Date();
+    const diffHours = Math.abs(now - messageDate) / 36e5;
+
+    if (diffHours < 24) {
+      return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return messageDate.toLocaleDateString();
   };
 
-  if (loading) return <div>Carregando...</div>;
-  if (error) return <div className="text-red-500">{error}</div>;
-
   return (
-    <div className="flex h-[600px] bg-white rounded-lg shadow">
+    <div className="flex h-[calc(100vh-200px)] bg-white rounded-lg shadow-lg">
       {/* Lista de conversas */}
-      <div className="w-1/3 border-r flex flex-col">
+      <div className="w-1/3 border-r">
         <div className="p-4 border-b">
-          <div className="flex justify-between items-center">
-            <h2 className="font-semibold">Conversas</h2>
-            <button
-              onClick={handleNewChat}
-              className="px-3 py-1 bg-blue-500 text-white rounded-md text-sm hover:bg-blue-600"
-            >
-              Nova Conversa
-            </button>
-          </div>
+          <h2 className="text-lg font-semibold">Conversas de Suporte</h2>
         </div>
-        <div className="overflow-y-auto flex-1">
+        <div className="overflow-y-auto h-full">
           {conversations.map((conv) => (
             <button
               key={conv.userId}
               onClick={() => setSelectedUser(conv.userId)}
-              className={`w-full p-4 text-left hover:bg-gray-50 border-b ${
-                selectedUser === conv.userId ? 'bg-gray-100' : ''
+              className={`w-full p-4 text-left hover:bg-gray-50 border-b relative ${
+                selectedUser === conv.userId ? 'bg-blue-50' : ''
               }`}
             >
-              <div className="font-medium">{conv.userName}</div>
-              <div className="text-sm text-gray-500 truncate">
-                {conv.lastMessage}
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-medium flex items-center">
+                    {conv.userName}
+                    <span className="ml-2 text-xs px-2 py-1 bg-gray-200 rounded-full">
+                      {conv.userRole === 'driver' ? 'Motorista' : 'Passageiro'}
+                    </span>
+                  </div>
+                  <div className="text-sm text-gray-500 truncate mt-1">
+                    {conv.lastMessage}
+                  </div>
+                </div>
+                <div className="text-xs text-gray-400">
+                  {formatLastMessageTime(conv.lastMessageAt)}
+                </div>
               </div>
+              {conv.unreadCount > 0 && (
+                <span className="absolute top-4 right-4 bg-blue-500 text-white text-xs rounded-full px-2 py-1">
+                  {conv.unreadCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Chat */}
+      {/* Área de chat */}
       <div className="flex-1 flex flex-col">
-        {showUserSelect ? (
-          <div className="p-4">
-            <h3 className="font-semibold mb-4">Selecione um usuário</h3>
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
-              {users.map((u) => (
-                <button
-                  key={u._id}
-                  onClick={() => loadMessages(u._id)}
-                  className="w-full p-3 text-left hover:bg-gray-50 rounded-lg border"
-                >
-                  <div className="font-medium">{u.name}</div>
-                  <div className="text-sm text-gray-500">{u.email}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : selectedUser ? (
+        {selectedUser ? (
           <>
+            <div className="p-4 border-b bg-gray-50">
+              <div className="font-medium">
+                {conversations.find(c => c.userId === selectedUser)?.userName}
+              </div>
+              <div className="text-sm text-gray-500">
+                {conversations.find(c => c.userId === selectedUser)?.userRole === 'driver' 
+                  ? 'Motorista' 
+                  : 'Passageiro'}
+              </div>
+            </div>
+
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((message) => (
                 <div
@@ -172,7 +158,7 @@ export default function AdminSupportChat() {
                     </p>
                     <p className="text-sm">{message.content}</p>
                     <span className="text-xs opacity-75 mt-1 block">
-                      {new Date(message.createdAt).toLocaleTimeString()}
+                      {formatLastMessageTime(message.createdAt)}
                     </span>
                   </div>
                 </div>
@@ -180,7 +166,7 @@ export default function AdminSupportChat() {
               <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-4 border-t">
+            <form onSubmit={handleSendMessage} className="p-4 border-t bg-gray-50">
               <div className="flex space-x-2">
                 <input
                   type="text"

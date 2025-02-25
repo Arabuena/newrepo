@@ -40,27 +40,29 @@ export default function Navbar() {
 
       {isHelpMenuOpen && (
         <div 
-          className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50"
+          className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
           onMouseEnter={() => setIsHelpMenuOpen(true)}
           onMouseLeave={() => setIsHelpMenuOpen(false)}
         >
-          {/* Mostrar chat da corrida apenas para motoristas e passageiros */}
-          {user && user.role !== 'admin' && (
-            <Link
-              to="/help/chat"
-              className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-              onClick={() => setIsHelpMenuOpen(false)}
-            >
-              Chat da Corrida
-            </Link>
-          )}
-          <Link
-            to="/help/support"
-            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            onClick={() => setIsHelpMenuOpen(false)}
-          >
-            Suporte
-          </Link>
+          <div className="py-1">
+            {user?.role === 'admin' ? (
+              // Menu para administradores
+              <Link
+                to="/admin/support"
+                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Central de Suporte
+              </Link>
+            ) : (
+              // Menu para usuários normais
+              <Link
+                to="/help/support"
+                className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Falar com Suporte
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>

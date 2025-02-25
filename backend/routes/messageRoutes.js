@@ -222,7 +222,16 @@ router.get('/support/conversations', auth, async (req, res) => {
 
     // Busca todas as mensagens de suporte agrupadas por usuário
     const conversations = await Message.aggregate([
-      { $match: { supportChat: true } },
+      { 
+        $match: { 
+          supportChat: true,
+          // Exclui conversas entre admins
+          $or: [
+            { 'sender.role': { $ne: 'admin' } },
+            { 'receiver.role': { $ne: 'admin' } }
+          ]
+        } 
+      },
       { $sort: { createdAt: -1 } },
       {
         $group: {
@@ -234,22 +243,39 @@ router.get('/support/conversations', auth, async (req, res) => {
             ]
           },
           lastMessage: { $first: "$content" },
-          createdAt: { $first: "$createdAt" }
+          unreadCount: {
+            $sum: {
+              $cond: [
+                { 
+                  $and: [
+                    { $eq: ["$receiver", req.user._id] },
+                    { $eq: ["$read", false] }
+                  ]
+                },
+                1,
+                0
+              ]
+            }
+          },
+          lastMessageAt: { $first: "$createdAt" }
         }
       },
-      { $sort: { createdAt: -1 } }
+      { $sort: { lastMessageAt: -1 } }
     ]);
 
     // Popula os dados dos usuários
     const populatedConversations = await User.populate(conversations, {
       path: '_id',
-      select: 'name'
+      select: 'name email role'
     });
 
     const formattedConversations = populatedConversations.map(conv => ({
       userId: conv._id._id,
       userName: conv._id.name,
-      lastMessage: conv.lastMessage
+      userRole: conv._id.role,
+      lastMessage: conv.lastMessage,
+      unreadCount: conv.unreadCount,
+      lastMessageAt: conv.lastMessageAt
     }));
 
     res.json(formattedConversations);
@@ -273,9 +299,20 @@ router.get('/support/user/:userId', auth, async (req, res) => {
         { sender: req.user._id, receiver: req.params.userId }
       ]
     })
-    .populate('sender', 'name')
-    .populate('receiver', 'name')
+    .populate('sender', 'name role')
+    .populate('receiver', 'name role')
     .sort('createdAt');
+
+    // Marca mensagens como lidas
+    await Message.updateMany(
+      {
+        supportChat: true,
+        sender: req.params.userId,
+        receiver: req.user._id,
+        read: false
+      },
+      { read: true }
+    );
 
     res.json(messages);
   } catch (error) {
