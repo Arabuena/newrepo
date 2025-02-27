@@ -4,9 +4,10 @@ services:
   backend:
     build: ./backend
     ports:
-      - "5000:5000"
+      - "3001:3001"
     environment:
-      - MONGODB_URI=mongodb+srv://ara100limite:ERxkG9nXZjbwvpMk@cluster0.yzf2r.mongodb.net/bora?retryWrites=true&w=majority
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=bora_uber_clone_secret_2024
       - PORT=5000
     restart: always
@@ -16,7 +17,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "3000:3000"
+      - "80:80"
     environment:
       - REACT_APP_API_URL=http://localhost:5000/api
       - REACT_APP_GOOGLE_MAPS_API_KEY=AIzaSyAVe7W-B0zZa-6ePrcLfZkDzs1RGRSHSCc
