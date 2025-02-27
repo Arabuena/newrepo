@@ -1,4 +1,5 @@
-FROM node:18-alpine
+# Primeiro estágio - Builder
+FROM node:18-alpine as builder
 
 WORKDIR /app
 
@@ -11,6 +12,18 @@ COPY . .
 # Remove as variáveis de ambiente hardcoded
 RUN rm -f .env .env.local
 
-EXPOSE 3000
+# Criar build de produção
+RUN npm run build
 
-CMD ["npm", "start"] 
+# Segundo estágio - Nginx
+FROM nginx:alpine
+
+# Copiar build para nginx
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Copiar configuração do nginx (se necessário)
+# COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"] 
