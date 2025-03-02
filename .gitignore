@@ -1,19 +1,5 @@
-# Node
-node_modules/
-npm-debug.log*
-
-# Environment
 .env
-.env.*
-**/.env
-**/.env.*
-/etc/environment
-setup-env.sh
-
-# Build
-/build
-/dist
-
-# Misc
-.DS_Store
-*.log 
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local 
