@@ -83,7 +83,9 @@ app.use('/api/messages', require('./routes/messageRoutes'));
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Barak Backend rodando na porta ${PORT}`);
+  console.log(`Ambiente: ${process.env.NODE_ENV}`);
+  console.log(`CORS Origin: ${process.env.CORS_ORIGIN}`);
 });
 
 // Tratamento de erros

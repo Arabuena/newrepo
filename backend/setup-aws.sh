@@ -14,10 +14,10 @@ sudo npm install -g pm2
 sudo apt install -y nginx
 
 # Configurar Nginx
-sudo tee /etc/nginx/sites-available/leva-backend << EOF
+sudo tee /etc/nginx/sites-available/barak-backend << EOF
 server {
     listen 80;
-    server_name \$host;
+    server_name barak 52.67.79.225;
 
     location / {
         proxy_pass http://localhost:5000;
@@ -49,7 +49,7 @@ server {
 EOF
 
 # Ativar configuração do Nginx
-sudo ln -s /etc/nginx/sites-available/leva-backend /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/barak-backend /etc/nginx/sites-enabled/
 sudo rm /etc/nginx/sites-enabled/default
 sudo systemctl restart nginx
 
