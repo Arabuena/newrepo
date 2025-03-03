@@ -8,9 +8,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
-        sync: false
+        value: mongodb+srv://ara100limite:ERxkG9nXZjbwvpMk@cluster0.yzf2r.mongodb.net/bora?retryWrites=true&w=majority
       - key: JWT_SECRET
-        sync: false
+        value: bora_uber_clone_secret_2024
       - key: PORT
         value: "10000"
       - key: CORS_ORIGIN

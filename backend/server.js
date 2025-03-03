@@ -8,7 +8,7 @@ const app = express();
 
 // Middleware para logs
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Origin: ${req.headers.origin}`);
   next();
 });
 
@@ -32,6 +32,24 @@ app.get('/', (req, res) => {
     status: 'ok',
     message: 'Leva Backend API'
   });
+});
+
+// Rota de teste de conexão
+app.get('/test-db', async (req, res) => {
+  try {
+    const status = mongoose.connection.readyState;
+    const states = ['desconectado', 'conectado', 'conectando', 'desconectando'];
+    res.json({
+      status: states[status],
+      database: mongoose.connection.name,
+      host: mongoose.connection.host
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 });
 
 // Conectar ao MongoDB
