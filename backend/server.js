@@ -19,13 +19,18 @@ app.use((req, res, next) => {
 // Configurar CORS
 const corsOptions = {
   origin: ['https://newrepo-woad-nine.vercel.app', 'http://localhost:3000'],
-  methods: ['GET', 'POST', 'PUT', DELETE, 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
   maxAge: 86400
 };
 
+// Aplicar CORS
 app.use(cors(corsOptions));
+
+// Middleware para preflight requests
+app.options('*', cors(corsOptions));
+
 app.use(express.json());
 
 // Rota de health check

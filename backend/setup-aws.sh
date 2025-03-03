@@ -35,17 +35,21 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         
-        # Aumentar timeouts
-        proxy_connect_timeout 60;
-        proxy_send_timeout 60;
-        proxy_read_timeout 60;
-        send_timeout 60;
-        
         # CORS headers
         add_header 'Access-Control-Allow-Origin' 'https://newrepo-woad-nine.vercel.app' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
         add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept' always;
         add_header 'Access-Control-Allow-Credentials' 'true' always;
+        
+        if (\$request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://newrepo-woad-nine.vercel.app' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
     }
 
     # Adicionar log de erro específico
@@ -71,4 +75,5 @@ sudo certbot --nginx -d 52.67.79.225 --non-interactive --agree-tos --email ara10
 
 # Verificar status final
 sudo systemctl status nginx
+sudo certbot certificates 
 sudo certbot certificates 
