@@ -8,11 +8,27 @@ const app = express();
 
 // Middleware para logs detalhados
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}]`);
-  console.log(`Method: ${req.method}`);
-  console.log(`Path: ${req.path}`);
-  console.log(`Origin: ${req.headers.origin}`);
-  console.log(`Headers:`, req.headers);
+  const logInfo = {
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    path: req.path,
+    origin: req.headers.origin,
+    headers: req.headers,
+    body: req.method !== 'GET' ? req.body : undefined
+  };
+  
+  console.log('Request:', JSON.stringify(logInfo, null, 2));
+  
+  // Capturar a resposta
+  const oldSend = res.send;
+  res.send = function(data) {
+    console.log('Response:', {
+      status: res.statusCode,
+      data: data
+    });
+    return oldSend.apply(res, arguments);
+  };
+  
   next();
 });
 
@@ -53,6 +69,15 @@ app.use('/api/rides', require('./routes/rideRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/messages', require('./routes/messageRoutes'));
+
+// Rota padrão para 404
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    path: req.path,
+    method: req.method
+  });
+});
 
 const PORT = process.env.PORT || 5000;
 

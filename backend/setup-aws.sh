@@ -24,8 +24,17 @@ server {
     listen 80;
     server_name 52.67.79.225;
 
-    location / {
-        proxy_pass http://127.0.0.1:5000;
+    # Rota para health check
+    location = /health {
+        proxy_pass http://127.0.0.1:5000/health;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+
+    # Rota para API
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000/api/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -52,7 +61,15 @@ server {
         }
     }
 
-    # Adicionar log de erro específico
+    # Rota padrão
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+    }
+
+    # Logs
     error_log /var/log/nginx/barak-error.log debug;
     access_log /var/log/nginx/barak-access.log;
 }
