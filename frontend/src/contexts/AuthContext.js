@@ -48,28 +48,29 @@ export function AuthProvider({ children }) {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ email, password })
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Resposta do login:', data);
-
-        const { token, user } = data;
-        
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        
-        setUser(user);
-        return user;
-      } else {
-        console.error('Erro no login:', response.statusText);
-        throw new Error(response.statusText);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const data = await response.json();
+      console.log('Resposta do login:', data);
+
+      const { token, user } = data;
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      setUser(user);
+      return user;
     } catch (error) {
-      console.error('Erro no login:', error.message);
+      console.error('Erro no login:', error);
       throw error;
     }
   };
