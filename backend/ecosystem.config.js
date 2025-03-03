@@ -15,9 +15,6 @@ module.exports = {
     watch: false,
     instances: 1,
     exec_mode: "fork",
-    max_memory_restart: "300M",
-    env: {
-      NODE_ENV: "development"
-    }
+    max_memory_restart: "300M"
   }]
 } 
