@@ -25,7 +25,7 @@ server {
     server_name 52.67.79.225;
 
     location / {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://127.0.0.1:5000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -35,12 +35,22 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         
+        # Aumentar timeouts
+        proxy_connect_timeout 60;
+        proxy_send_timeout 60;
+        proxy_read_timeout 60;
+        send_timeout 60;
+        
         # CORS headers
         add_header 'Access-Control-Allow-Origin' 'https://newrepo-woad-nine.vercel.app' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
         add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, Accept' always;
         add_header 'Access-Control-Allow-Credentials' 'true' always;
     }
+
+    # Adicionar log de erro específico
+    error_log /var/log/nginx/barak-error.log debug;
+    access_log /var/log/nginx/barak-access.log;
 }
 EOF
 

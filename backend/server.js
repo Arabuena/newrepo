@@ -16,65 +16,26 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configurar CORS de forma mais específica
+// Configurar CORS
 const corsOptions = {
   origin: ['https://newrepo-woad-nine.vercel.app', 'http://localhost:3000'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', DELETE, 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true,
-  maxAge: 86400 // Cache preflight por 24 horas
+  maxAge: 86400
 };
 
 app.use(cors(corsOptions));
-
-// Middleware para adicionar headers CORS manualmente
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
-  res.header('Access-Control-Allow-Credentials', true);
-  
-  // Handle preflight
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  next();
-});
-
 app.use(express.json());
 
-// Middleware para forçar HTTPS
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV === 'production' && !req.secure) {
-    return res.redirect('https://' + req.headers.host + req.url);
-  }
-  next();
-});
-
-// Mover a rota de health check para a raiz
-app.get('/', (req, res) => {
+// Rota de health check
+app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok',
-    message: 'Leva Backend API'
+    message: 'Barak Backend API',
+    environment: process.env.NODE_ENV,
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
-});
-
-// Rota de teste de conexão
-app.get('/test-db', async (req, res) => {
-  try {
-    const status = mongoose.connection.readyState;
-    const states = ['desconectado', 'conectado', 'conectando', 'desconectando'];
-    res.json({
-      status: states[status],
-      database: mongoose.connection.name,
-      host: mongoose.connection.host
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
-  }
 });
 
 // Conectar ao MongoDB
@@ -93,7 +54,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Barak Backend rodando na porta ${PORT}`);
   console.log(`Ambiente: ${process.env.NODE_ENV}`);
-  console.log(`CORS Origin: ${process.env.CORS_ORIGIN}`);
+  console.log(`CORS Origin: ${corsOptions.origin}`);
 });
 
 // Tratamento de erros

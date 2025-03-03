@@ -12,14 +12,9 @@ module.exports = {
     error_file: "logs/err.log",
     out_file: "logs/out.log",
     time: true,
-    max_memory_restart: "300M",
+    watch: false,
     instances: 1,
     exec_mode: "fork",
-    watch: false,
-    max_restarts: 10,
-    restart_delay: 4000,
-    autorestart: true,
-    merge_logs: true,
-    log_date_format: "YYYY-MM-DD HH:mm:ss Z"
+    max_memory_restart: "300M"
   }]
 } 

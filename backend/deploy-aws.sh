@@ -28,8 +28,11 @@ rm -rf node_modules
 echo "Instalando dependências..."
 npm install --omit=dev
 
+echo "Verificando se a porta 5000 está em uso..."
+sudo lsof -i :5000
+
 echo "Iniciando aplicação com PM2..."
-pm2 start ecosystem.config.js --env production
+NODE_ENV=production pm2 start ecosystem.config.js --env production
 
 echo "Salvando configuração do PM2..."
 pm2 save
