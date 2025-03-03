@@ -6,33 +6,36 @@ require('dotenv').config();
 
 const app = express();
 
-// Configurar CORS
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://newrepo-woad-nine.vercel.app', 'http://localhost:3000']
-    : 'http://localhost:3000',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
-
-// Adicionar headers de CORS manualmente
+// Middleware para logs
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'https://newrepo-woad-nine.vercel.app');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', true);
+  console.log(`${req.method} ${req.path} - Origin: ${req.headers.origin}`);
   next();
 });
 
+// Configurar CORS - versão mais permissiva para debug
+app.use(cors({
+  origin: true, // Permite todas as origens em desenvolvimento
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
+}));
+
+// Pre-flight requests
+app.options('*', cors());
+
 app.use(express.json());
 
-// Rota de health check
+// Rota de health check com CORS info
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ 
+    status: 'ok',
+    cors: {
+      origin: req.headers.origin,
+      method: req.method,
+      headers: req.headers
+    }
+  });
 });
 
 // Conectar ao MongoDB
