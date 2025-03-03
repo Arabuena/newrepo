@@ -14,4 +14,6 @@ services:
       - key: PORT
         value: "10000"
       - key: CORS_ORIGIN
-        value: "https://newrepo-woad-nine.vercel.app" 
+        value: "https://newrepo-woad-nine.vercel.app"
+      - key: ALLOWED_ORIGINS
+        value: "https://newrepo-woad-nine.vercel.app,http://localhost:3000" 

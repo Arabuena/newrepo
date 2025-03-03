@@ -49,31 +49,29 @@ export function AuthProvider({ children }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': window.location.origin
+          'Accept': 'application/json'
         },
+        credentials: 'include',
         mode: 'cors',
-        credentials: 'same-origin',
         body: JSON.stringify({ email, password })
       });
-      
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-      
+
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Error response:', errorData);
-        throw new Error(errorData || `HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Response não ok:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(errorText || response.statusText);
       }
-      
+
       const data = await response.json();
       console.log('Resposta do login:', data);
 
       const { token, user } = data;
-      
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
-      
       setUser(user);
       return user;
     } catch (error) {

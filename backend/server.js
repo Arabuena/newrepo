@@ -6,23 +6,40 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware para logs
+// Middleware para logs detalhados
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - Origin: ${req.headers.origin}`);
+  console.log(`[${new Date().toISOString()}]`);
+  console.log(`Method: ${req.method}`);
+  console.log(`Path: ${req.path}`);
+  console.log(`Origin: ${req.headers.origin}`);
+  console.log(`Headers:`, req.headers);
   next();
 });
 
-// Configurar CORS - versão mais permissiva para debug
-app.use(cors({
-  origin: true, // Permite todas as origens em desenvolvimento
-  credentials: true,
+// Configurar CORS de forma mais específica
+const corsOptions = {
+  origin: ['https://newrepo-woad-nine.vercel.app', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range']
-}));
+  credentials: true,
+  maxAge: 86400 // Cache preflight por 24 horas
+};
 
-// Pre-flight requests
-app.options('*', cors());
+app.use(cors(corsOptions));
+
+// Middleware para adicionar headers CORS manualmente
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.header('Access-Control-Allow-Credentials', true);
+  
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  next();
+});
 
 app.use(express.json());
 
