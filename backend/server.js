@@ -6,12 +6,22 @@ require('dotenv').config();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// Configurar CORS para aceitar apenas o domínio da Vercel em produção
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://leva-frontend.vercel.app', 'http://localhost:3000']
+    : 'http://localhost:3000'
+}));
+
 app.use(express.json());
 
 // Conectar ao MongoDB
 connectDB();
+
+// Rota de health check para o Heroku
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 // Rotas
 app.use('/api/auth', require('./routes/authRoutes'));

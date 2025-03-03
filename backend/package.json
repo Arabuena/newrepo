@@ -1,8 +1,11 @@
 {
-  "name": "uber-clone-backend",
+  "name": "backend",
   "version": "1.0.0",
   "description": "Backend para clone do Uber",
   "main": "server.js",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
