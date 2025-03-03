@@ -43,6 +43,14 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Middleware para forçar HTTPS
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === 'production' && !req.secure) {
+    return res.redirect('https://' + req.headers.host + req.url);
+  }
+  next();
+});
+
 // Mover a rota de health check para a raiz
 app.get('/', (req, res) => {
   res.status(200).json({ 
