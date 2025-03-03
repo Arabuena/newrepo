@@ -13,4 +13,10 @@ yarn-error.log*
 
 # lock files
 package-lock.json
-yarn.lock 
+yarn.lock
+.yarn
+.pnp.*
+
+# IDE
+.vscode/
+.idea/ 
