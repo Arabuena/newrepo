@@ -17,12 +17,12 @@
     }
   ],
   "env": {
-    "REACT_APP_API_URL": "https://leva-backend.onrender.com/api",
+    "REACT_APP_API_URL": "https://srv-cv2f7r3tq21c73dg326g.onrender.com/api",
     "REACT_APP_GOOGLE_MAPS_API_KEY": "AIzaSyAVe7W-B0zZa-6ePrcLfZkDzs1RGRSHSCc"
   },
   "build": {
     "env": {
-      "REACT_APP_API_URL": "https://leva-backend.onrender.com/api",
+      "REACT_APP_API_URL": "https://srv-cv2f7r3tq21c73dg326g.onrender.com/api",
       "REACT_APP_GOOGLE_MAPS_API_KEY": "AIzaSyAVe7W-B0zZa-6ePrcLfZkDzs1RGRSHSCc"
     }
   }

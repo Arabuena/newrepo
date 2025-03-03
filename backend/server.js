@@ -26,15 +26,11 @@ app.options('*', cors());
 
 app.use(express.json());
 
-// Rota de health check com CORS info
-app.get('/health', (req, res) => {
+// Mover a rota de health check para a raiz
+app.get('/', (req, res) => {
   res.status(200).json({ 
     status: 'ok',
-    cors: {
-      origin: req.headers.origin,
-      method: req.method,
-      headers: req.headers
-    }
+    message: 'Leva Backend API'
   });
 });
 
